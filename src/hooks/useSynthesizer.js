@@ -7,6 +7,8 @@ export const useSynthesizer = () => {
   const filterRef = useRef(null)
   const [isStarted, setIsStarted] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [isLoaded, setIsLoaded] = useState(false)
+  const [instrument, setInstrument] = useState('piano')
 
   useEffect(() => {
     // Create audio chain: Synth -> Filter -> Reverb -> Output
@@ -21,17 +23,42 @@ export const useSynthesizer = () => {
       wet: 0.3
     })
 
-    synthRef.current = new Tone.PolySynth(Tone.Synth, {
-      oscillator: {
-        type: 'sine'
-      },
-      envelope: {
-        attack: 0.05,
-        decay: 0.3,
-        sustain: 0.4,
-        release: 1
+    const createSampler = () => {
+      setIsLoaded(false)
+      if (instrument === 'piano') {
+        return new Tone.Sampler(
+          {
+            A1: 'A1.mp3',
+            C2: 'C2.mp3',
+            C3: 'C3.mp3',
+            C4: 'C4.mp3',
+            C5: 'C5.mp3'
+          },
+          () => setIsLoaded(true),
+          'https://tonejs.github.io/audio/salamander/'
+        )
       }
-    }).chain(filterRef.current, reverbRef.current, Tone.Destination)
+      if (instrument === 'violin') {
+        return new Tone.Sampler(
+          {
+            A3: 'A3.mp3',
+            C4: 'C4.mp3',
+            E4: 'E4.mp3',
+            A4: 'A4.mp3',
+            C5: 'C5.mp3'
+          },
+          () => setIsLoaded(true),
+          'https://cdn.jsdelivr.net/gh/nbrosowsky/tonejs-instruments@master/samples/violin/'
+        )
+      }
+      return new Tone.Sampler(
+        { C4: 'C4.mp3' },
+        () => setIsLoaded(true),
+        'https://tonejs.github.io/audio/salamander/'
+      )
+    }
+
+    synthRef.current = createSampler().chain(filterRef.current, reverbRef.current, Tone.Destination)
 
     return () => {
       if (synthRef.current) {
@@ -44,7 +71,7 @@ export const useSynthesizer = () => {
         reverbRef.current.dispose()
       }
     }
-  }, [])
+  }, [instrument])
 
   const start = async () => {
     if (!isStarted) {
@@ -54,7 +81,7 @@ export const useSynthesizer = () => {
   }
 
   const playNote = (note, duration = '8n', velocity = 0.5) => {
-    if (synthRef.current && isStarted) {
+    if (synthRef.current && isStarted && isLoaded) {
       synthRef.current.triggerAttackRelease(note, duration, undefined, velocity)
       setIsPlaying(true)
       setTimeout(() => setIsPlaying(false), Tone.Time(duration).toMilliseconds())
@@ -62,21 +89,21 @@ export const useSynthesizer = () => {
   }
 
   const triggerAttack = (note, velocity = 0.5) => {
-    if (synthRef.current && isStarted) {
+    if (synthRef.current && isStarted && isLoaded) {
       synthRef.current.triggerAttack(note, undefined, velocity)
       setIsPlaying(true)
     }
   }
 
   const triggerRelease = (note) => {
-    if (synthRef.current && isStarted) {
+    if (synthRef.current && isStarted && isLoaded) {
       synthRef.current.triggerRelease(note)
       setIsPlaying(false)
     }
   }
 
   const setFrequency = (freq) => {
-    if (synthRef.current && isStarted) {
+    if (synthRef.current && isStarted && isLoaded && 'set' in synthRef.current) {
       synthRef.current.set({ frequency: freq })
     }
   }
@@ -109,7 +136,10 @@ export const useSynthesizer = () => {
     setReverb,
     setVolume,
     isStarted,
-    isPlaying
+    isPlaying,
+    isLoaded,
+    instrument,
+    setInstrument
   }
 }
 

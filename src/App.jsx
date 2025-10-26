@@ -17,7 +17,10 @@ function App() {
     setReverb,
     setVolume,
     isStarted,
-    isPlaying
+    isPlaying,
+    isLoaded,
+    instrument,
+    setInstrument
   } = useSynthesizer()
   
   const [gestureData, setGestureData] = useState(null)
@@ -103,6 +106,18 @@ function App() {
           <div className="status">
             <div className={`indicator ${isPlaying ? 'active' : ''}`}>
               {isPlaying ? '🔊 Playing' : '🔇 Silent'}
+            </div>
+            <div className="controls">
+              <label>
+                Instrument:
+                <select value={instrument} onChange={(e) => setInstrument(e.target.value)}>
+                  <option value="piano">Piano</option>
+                  <option value="violin">Violin</option>
+                </select>
+              </label>
+              {!isLoaded && (
+                <span className="loading"> Loading instrument samples...</span>
+              )}
             </div>
           </div>
         )}
