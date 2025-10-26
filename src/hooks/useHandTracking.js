@@ -8,21 +8,27 @@ export const useHandTracking = (videoRef, canvasRef) => {
   const handLandmarkerRef = useRef(null)
   const gestureRecognizerRef = useRef(null)
   const animationFrameRef = useRef(null)
+  const streamRef = useRef(null) // Store stream to persist across renders
 
   useEffect(() => {
-    let stream = null
 
     const initializeHandTracking = async () => {
       try {
         setIsLoading(true)
 
         // Request webcam access first (this triggers the browser prompt)
-        stream = await navigator.mediaDevices.getUserMedia({
+        const stream = await navigator.mediaDevices.getUserMedia({
           video: { width: 1280, height: 720 }
         })
+        
+        // Store stream in ref to persist across re-renders
+        streamRef.current = stream
 
         if (videoRef.current) {
           videoRef.current.srcObject = stream
+          // Explicitly play the video
+          videoRef.current.play().catch(err => console.error('Error playing video:', err))
+          console.log('📹 Video stream attached and playing')
         }
 
         // Now initialize MediaPipe in parallel
@@ -71,6 +77,9 @@ export const useHandTracking = (videoRef, canvasRef) => {
 
     const startTracking = () => {
       if (!videoRef.current || !handLandmarkerRef.current || !gestureRecognizerRef.current) return
+
+      console.log('📹 Starting hand tracking, video ready state:', videoRef.current.readyState)
+      console.log('📹 Video dimensions:', videoRef.current.videoWidth, 'x', videoRef.current.videoHeight)
 
       const detectHands = async () => {
         if (videoRef.current && videoRef.current.readyState >= 2) {
@@ -150,8 +159,8 @@ export const useHandTracking = (videoRef, canvasRef) => {
       }
       
       // Stop webcam stream
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop())
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop())
       }
       
       // Clean up video element
@@ -173,6 +182,17 @@ export const useHandTracking = (videoRef, canvasRef) => {
       }
     }
   }, [videoRef, canvasRef])
+
+  // Re-attach stream if video element changes (e.g., during conditional rendering)
+  useEffect(() => {
+    if (videoRef.current && streamRef.current) {
+      if (videoRef.current.srcObject !== streamRef.current) {
+        console.log('📹 Re-attaching video stream to video element')
+        videoRef.current.srcObject = streamRef.current
+        videoRef.current.play().catch(err => console.error('Error playing video after re-attach:', err))
+      }
+    }
+  }) // Run on every render to catch video element changes
 
   return { handData, isLoading, error }
 }
