@@ -17,11 +17,8 @@ function App() {
     start,
     stop,
     resume,
-    triggerAttack,
-    triggerRelease,
-    setFilterFrequency,
-    setReverb,
-    setVolume,
+    updateParams,
+    stopHand,
     cycleInstrument,
     startRecording,
     stopRecording,
@@ -224,28 +221,25 @@ function App() {
 
     // Process each hand
     params.hands.forEach((hand) => {
-      const handType = hand.handedness
-      // FIX: Swap the logic - MediaPipe reports Right as Left and vice versa in mirror view
-      const isLeft = handType === 'Right' // Swapped!
+      const handType = hand.handedness // This is the PHYSICAL hand (Left = left, Right = right)
+      const isLeft = handType === 'Left'
       const wasPlaying = isLeft ? leftWasPlaying : rightWasPlaying
       const setWasPlaying = isLeft ? setLeftWasPlaying : setRightWasPlaying
-      const actualHandType = isLeft ? 'Left' : 'Right' // Use corrected hand type
 
-      // For gesture tracking, use the physical hand (actualHandType) consistently
       // Check for thumbs up (cycle instrument up)
-      const currentThumbsUpTime = actualHandType === 'Left' ? leftThumbsUpTime : rightThumbsUpTime
+      const currentThumbsUpTime = isLeft ? leftThumbsUpTime : rightThumbsUpTime
       if (hand.isThumbsUp && !currentThumbsUpTime) {
         // Only set time and cycle instrument if we weren't already holding thumbs up
-        if (actualHandType === 'Left') {
+        if (isLeft) {
           setLeftThumbsUpTime(Date.now())
         } else {
           setRightThumbsUpTime(Date.now())
         }
-        console.log(`👍 ${actualHandType} hand thumbs up - cycling instrument`)
-        cycleInstrument(actualHandType, 'up')
+        console.log(`👍 ${handType} hand thumbs up - cycling instrument`)
+        cycleInstrument(handType, 'up')
       } else if (!hand.isThumbsUp && currentThumbsUpTime) {
         // Only reset if we were holding thumbs up and now stopped
-        if (actualHandType === 'Left') {
+        if (isLeft) {
           setLeftThumbsUpTime(null)
         } else {
           setRightThumbsUpTime(null)
@@ -253,19 +247,19 @@ function App() {
       }
 
       // Check for thumbs down (cycle instrument down)
-      const currentThumbsDownTime = actualHandType === 'Left' ? leftThumbsDownTime : rightThumbsDownTime
+      const currentThumbsDownTime = isLeft ? leftThumbsDownTime : rightThumbsDownTime
       if (hand.isThumbsDown && !currentThumbsDownTime) {
         // Only set time and cycle instrument if we weren't already holding thumbs down
-        if (actualHandType === 'Left') {
+        if (isLeft) {
           setLeftThumbsDownTime(Date.now())
         } else {
           setRightThumbsDownTime(Date.now())
         }
-        console.log(`👎 ${actualHandType} hand thumbs down - cycling instrument`)
-        cycleInstrument(actualHandType, 'down')
+        console.log(`👎 ${handType} hand thumbs down - cycling instrument`)
+        cycleInstrument(handType, 'down')
       } else if (!hand.isThumbsDown && currentThumbsDownTime) {
         // Only reset if we were holding thumbs down and now stopped
-        if (actualHandType === 'Left') {
+        if (isLeft) {
           setLeftThumbsDownTime(null)
         } else {
           setRightThumbsDownTime(null)
@@ -275,17 +269,19 @@ function App() {
       // Skip control gestures if music is not enabled or stopped
       if (!canPlay || isStopped) return
 
-      // Update filter and reverb continuously
-      setFilterFrequency(actualHandType, hand.filterFreq)
-      setReverb(hand.reverb)
-      setVolume(actualHandType, hand.volume)
-      
-      // Trigger note on pinch
-      if (hand.isPinched && !wasPlaying) {
-        triggerAttack(actualHandType, hand.note, hand.pinch)
+      // Continuously update musical parameters based on hand position
+      if (hand.isPinched) {
+        updateParams(
+          handType,
+          hand.note,
+          hand.velocity,
+          hand.filterFreq,
+          hand.reverb
+        )
         setWasPlaying(true)
-      } else if (!hand.isPinched && wasPlaying) {
-        triggerRelease(actualHandType, hand.note)
+      } else if (wasPlaying) {
+        // Stop playing when pinch is released
+        stopHand(handType)
         setWasPlaying(false)
       }
     })
@@ -468,8 +464,12 @@ function App() {
                     <span className="value">{hand.note || 'N/A'}</span>
                   </div>
                   <div className="data-item">
-                    <span className="label">Frequency:</span>
-                    <span className="value">{hand.frequency?.toFixed(1)} Hz</span>
+                    <span className="label">Bass:</span>
+                    <span className="value">{hand.bassNote || 'N/A'}</span>
+                  </div>
+                  <div className="data-item">
+                    <span className="label">Brightness:</span>
+                    <span className="value">{(hand.brightness * 100).toFixed(0)}%</span>
                   </div>
                   <div className="data-item">
                     <span className="label">Filter:</span>
@@ -484,8 +484,8 @@ function App() {
                     <span className="value">{(hand.reverb * 100).toFixed(0)}%</span>
                   </div>
                   <div className="data-item">
-                    <span className="label">Volume:</span>
-                    <span className="value">{hand.volume.toFixed(1)} dB</span>
+                    <span className="label">Velocity:</span>
+                    <span className="value">{hand.velocity.toFixed(2)}</span>
                   </div>
                   {hand.isThumbsUp && (
                     <div className="data-item gesture-detected">
@@ -523,10 +523,11 @@ function App() {
           {calibrationComplete ? (
             <ul>
               <li>✌️✌️ <strong>Both Hands Victory Sign</strong>: Hold for 2 seconds to START playing music</li>
-              <li>✋ <strong>Hand Height</strong>: Controls pitch (higher = higher note)</li>
-              <li>↔️ <strong>Hand Position (Left/Right)</strong>: Controls filter frequency</li>
-              <li>🤏 <strong>Pinch</strong>: Trigger notes (thumb + index finger)</li>
-              <li>👐 <strong>Hand Openness</strong>: Controls reverb amount</li>
+              <li>🤏 <strong>Pinch (thumb + index)</strong>: Activate sound for that hand</li>
+              <li>⬆️⬇️ <strong>Hand Height</strong>: Controls pitch (quantized to pentatonic scale - always sounds good!)</li>
+              <li>⬅️➡️ <strong>Hand Position</strong>: Controls brightness/timbre (left = dark, right = bright)</li>
+              <li>🎵 <strong>Automatic Bass</strong>: Each hand plays melody + bass harmony</li>
+              <li>⏱️ <strong>Rhythmic Quantization</strong>: Notes sync to musical timing (8th notes at 120 BPM)</li>
               <li>👍 <strong>Thumbs Up</strong>: Cycle to next instrument (per hand)</li>
               <li>👎 <strong>Thumbs Down</strong>: Cycle to previous instrument (per hand)</li>
               <li>🖐️🖐️ <strong>Both Hands Open</strong>: Hold for 5 seconds to STOP playing</li>

@@ -150,40 +150,62 @@ export const detectFist = (landmarks) => {
   return allCurled
 }
 
+// Pentatonic scale - always sounds musical, no dissonance
+// C major pentatonic: C, D, E, G, A
+const PENTATONIC_SCALE = ['C3', 'D3', 'E3', 'G3', 'A3', 'C4', 'D4', 'E4', 'G4', 'A4', 'C5', 'D5', 'E5']
+
 /**
- * Map hand center position to pitch (frequency)
- * Uses average of all landmarks
+ * Map hand Y position to quantized pentatonic note
+ * Higher hand = higher pitch (quantized to always sound good)
  */
-export const mapHandCenterToPitch = (landmarks) => {
+export const mapHandToNote = (landmarks) => {
   if (!landmarks || landmarks.length === 0) return null
   
   const center = calculateHandCenter(landmarks)
   // Invert Y (0 = top, 1 = bottom in screen coords)
   const normalizedY = 1 - center.y
   
-  // Map to frequency range (200 Hz to 1000 Hz)
-  const minFreq = 200
-  const maxFreq = 1000
-  const frequency = minFreq + (normalizedY * (maxFreq - minFreq))
+  // Quantize to pentatonic scale
+  const noteIndex = Math.floor(normalizedY * PENTATONIC_SCALE.length)
+  const clampedIndex = Math.max(0, Math.min(PENTATONIC_SCALE.length - 1, noteIndex))
   
-  return frequency
+  return PENTATONIC_SCALE[clampedIndex]
 }
 
 /**
- * Map hand center X position to filter frequency
+ * Get bass note (octave below) for harmonic depth
  */
-export const mapHandCenterToFilter = (landmarks) => {
+export const getBassNote = (note) => {
+  if (!note) return null
+  // Transpose down one octave (-12 semitones)
+  // Extract note name and octave
+  const noteName = note.slice(0, -1)
+  const octave = parseInt(note.slice(-1))
+  return `${noteName}${Math.max(1, octave - 1)}`
+}
+
+/**
+ * Map hand X position to brightness (filter frequency + reverb)
+ * Left = dark/intimate, Right = bright/airy
+ */
+export const mapHandToBrightness = (landmarks) => {
   if (!landmarks || landmarks.length === 0) return null
   
   const center = calculateHandCenter(landmarks)
   const normalizedX = center.x
   
-  // Map to filter frequency range (200 Hz to 5000 Hz)
-  const minFilter = 200
+  // Brightness controls both filter and reverb
+  // Filter: 300Hz (dark) to 5000Hz (bright)
+  const minFilter = 300
   const maxFilter = 5000
   const filterFreq = minFilter + (normalizedX * (maxFilter - minFilter))
   
-  return filterFreq
+  // Reverb: 0.1 (dry) to 0.5 (spacious)
+  const minReverb = 0.1
+  const maxReverb = 0.5
+  const reverb = minReverb + (normalizedX * (maxReverb - minReverb))
+  
+  return { filterFreq, reverb, brightness: normalizedX }
 }
 
 /**
@@ -260,11 +282,12 @@ export const detectPinch = (landmarks) => {
 }
 
 /**
- * Map pinch strength to volume
+ * Map pinch strength to velocity (not volume)
+ * For triggering notes with expression
  */
-export const mapPinchToVolume = (pinchValue) => {
-  // Map 0-1 pinch to -30 to 0 dB volume
-  return (pinchValue * 30) - 30
+export const mapPinchToVelocity = (pinchValue) => {
+  // Map 0-1 pinch to 0.3-1.0 velocity
+  return 0.3 + (pinchValue * 0.7)
 }
 
 /**
@@ -293,31 +316,9 @@ export const calculateHandOpenness = (landmarks) => {
 }
 
 /**
- * Map hand openness to reverb amount
- */
-export const mapOpennessToReverb = (openness) => {
-  // Open hand = more reverb (0 to 0.7)
-  return openness * 0.7
-}
-
-/**
- * Generate a musical note from frequency
- * Maps to nearest note in chromatic scale
- */
-export const frequencyToNote = (frequency) => {
-  const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
-  
-  // Calculate MIDI note number from frequency
-  const midiNote = Math.round(12 * Math.log2(frequency / 440) + 69)
-  const octave = Math.floor(midiNote / 12) - 1
-  const noteName = noteNames[midiNote % 12]
-  
-  return `${noteName}${octave}`
-}
-
-/**
  * Main gesture processing function
- * Takes hand landmarks and returns synthesizer parameters for each hand
+ * Takes hand landmarks and returns musical parameters for each hand
+ * Based on sound field theory: Y-axis = pitch, X-axis = brightness
  */
 export const processGestures = (handData) => {
   if (!handData || !handData.landmarks || handData.landmarks.length === 0) {
@@ -329,19 +330,22 @@ export const processGestures = (handData) => {
   // Process each detected hand
   for (let i = 0; i < Math.min(handData.landmarks.length, 2); i++) {
     const landmarks = handData.landmarks[i]
-    const handedness = handData.handednesses && handData.handednesses[i] 
+    const mediaPipeHandedness = handData.handednesses && handData.handednesses[i] 
       ? handData.handednesses[i][0].categoryName 
       : (i === 0 ? 'Left' : 'Right')
     
-    // Use hand center for position-based controls
-    const frequency = mapHandCenterToPitch(landmarks)
-    const filterFreq = mapHandCenterToFilter(landmarks)
-    const pinch = detectPinch(landmarks)
-    const volume = mapPinchToVolume(pinch)
-    const openness = calculateHandOpenness(landmarks)
-    const reverb = mapOpennessToReverb(openness)
+    // IMPORTANT: MediaPipe reports handedness in mirror view (video is mirrored)
+    // So we need to swap: MediaPipe's "Right" = physical LEFT hand, MediaPipe's "Left" = physical RIGHT hand
+    const handedness = mediaPipeHandedness === 'Right' ? 'Left' : 'Right'
     
-    // Detect gestures
+    // Musical mapping: height = pitch, position = brightness
+    const note = mapHandToNote(landmarks)
+    const bassNote = getBassNote(note)
+    const brightness = mapHandToBrightness(landmarks)
+    const pinch = detectPinch(landmarks)
+    const velocity = mapPinchToVelocity(pinch)
+    
+    // Detect gestures for control
     const isOpenPalm = detectOpenPalm(landmarks)
     const isThumbsUp = detectThumbsUp(landmarks)
     const isThumbsDown = detectThumbsDown(landmarks)
@@ -349,15 +353,15 @@ export const processGestures = (handData) => {
     const isVictorySign = detectVictorySign(landmarks)
     
     hands.push({
-      handedness,
+      handedness, // This is now the PHYSICAL hand (left/right in real world)
       landmarks,
-      frequency,
-      note: frequency ? frequencyToNote(frequency) : null,
-      filterFreq,
+      note,           // Quantized to pentatonic scale
+      bassNote,       // Octave below for harmonic depth
+      filterFreq: brightness.filterFreq,
+      reverb: brightness.reverb,
+      brightness: brightness.brightness,
       pinch,
-      volume,
-      openness,
-      reverb,
+      velocity,
       isPinched: pinch > 0.7,
       isOpenPalm,
       isThumbsUp,
@@ -371,7 +375,7 @@ export const processGestures = (handData) => {
   const bothHandsOpen = hands.length === 2 && 
                         hands.every(hand => hand.isOpenPalm)
   
-  // Detect both hands fist (recording gesture - dummy for now)
+  // Detect both hands fist (recording gesture)
   const bothHandsFist = hands.length === 2 && 
                         hands.every(hand => hand.isFist)
   
