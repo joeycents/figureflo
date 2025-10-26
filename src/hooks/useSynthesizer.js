@@ -53,14 +53,6 @@ export const useSynthesizer = () => {
     }
   }
 
-  const playNote = (note, duration = '8n', velocity = 0.5) => {
-    if (synthRef.current && isStarted) {
-      synthRef.current.triggerAttackRelease(note, duration, undefined, velocity)
-      setIsPlaying(true)
-      setTimeout(() => setIsPlaying(false), Tone.Time(duration).toMilliseconds())
-    }
-  }
-
   const triggerAttack = (note, velocity = 0.5) => {
     if (synthRef.current && isStarted) {
       synthRef.current.triggerAttack(note, undefined, velocity)
@@ -72,12 +64,6 @@ export const useSynthesizer = () => {
     if (synthRef.current && isStarted) {
       synthRef.current.triggerRelease(note)
       setIsPlaying(false)
-    }
-  }
-
-  const setFrequency = (freq) => {
-    if (synthRef.current && isStarted) {
-      synthRef.current.set({ frequency: freq })
     }
   }
 
@@ -101,10 +87,8 @@ export const useSynthesizer = () => {
 
   return {
     start,
-    playNote,
     triggerAttack,
     triggerRelease,
-    setFrequency,
     setFilterFrequency,
     setReverb,
     setVolume,
