@@ -15,10 +15,7 @@ header {
 h1 {
   font-size: 3rem;
   margin-bottom: 0.5rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--gold);
 }
 
 header p {
@@ -50,18 +47,18 @@ main {
 }
 
 .loading {
-  background: rgba(102, 126, 234, 0.1);
+  background: rgba(11, 17, 32, 0.6);
   padding: 2rem;
-  border-radius: 12px;
+  border-radius: 8px;
   text-align: center;
-  border: 2px solid #667eea;
+  border: 1px solid var(--gold);
   min-width: 400px;
 }
 
 .loading p {
   margin: 0;
   font-size: 1.1rem;
-  color: #667eea;
+  color: var(--gold);
 }
 
 .progress-bar-container {
@@ -75,10 +72,10 @@ main {
 
 .progress-bar-fill {
   height: 100%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--gold);
   border-radius: 4px;
   transition: width 0.05s linear;
-  box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
+  box-shadow: 0 0 10px rgba(248, 184, 58, 0.5);
 }
 
 .progress-bar-fill.complete {
@@ -88,26 +85,26 @@ main {
 @keyframes progressPop {
   0% {
     transform: scaleY(1);
-    box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
+    box-shadow: 0 0 10px rgba(248, 184, 58, 0.5);
   }
   30% {
     transform: scaleY(1.8);
-    box-shadow: 0 0 30px rgba(102, 126, 234, 0.9),
-                0 0 60px rgba(118, 75, 162, 0.6);
+    box-shadow: 0 0 30px rgba(248, 184, 58, 0.9),
+                0 0 60px rgba(76, 194, 180, 0.6);
   }
   50% {
     transform: scaleY(2.2);
-    box-shadow: 0 0 40px rgba(102, 126, 234, 1),
-                0 0 80px rgba(118, 75, 162, 0.8);
-    background: linear-gradient(135deg, #00ff88 0%, #667eea 50%, #764ba2 100%);
+    box-shadow: 0 0 40px rgba(248, 184, 58, 1),
+                0 0 80px rgba(76, 194, 180, 0.8);
+    background: var(--teal);
   }
   70% {
     transform: scaleY(1.5);
   }
   100% {
     transform: scaleY(1);
-    box-shadow: 0 0 20px rgba(0, 255, 136, 0.8);
-    background: linear-gradient(135deg, #00ff88 0%, #667eea 100%);
+    box-shadow: 0 0 20px rgba(76, 194, 180, 0.8);
+    background: var(--teal);
   }
 }
 
@@ -201,21 +198,20 @@ main {
 }
 
 .start-button {
-  font-size: 1.5rem;
-  padding: 1.5rem 3rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  font-size: 1.2rem;
+  padding: 1rem 2.5rem;
+  background: var(--gold);
+  color: var(--navy);
   border: none;
-  border-radius: 50px;
+  border-radius: 8px;
   cursor: pointer;
-  font-weight: bold;
-  transition: all 0.3s ease;
-  box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+  font-weight: 600;
+  transition: all 0.2s ease;
 }
 
 .start-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 15px 40px rgba(102, 126, 234, 0.4);
+  transform: translateY(-1px);
+  opacity: 0.9;
 }
 
 .start-button:active {
@@ -237,17 +233,17 @@ main {
 }
 
 .indicator.active {
-  color: #00ff88;
+  color: var(--teal);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
 .indicator.stopped {
-  color: #ff4444;
+  color: var(--coral-red);
   font-weight: bold;
 }
 
 .indicator.waiting {
-  color: #ffb84d;
+  color: var(--gold);
   font-weight: bold;
   animation: waiting-pulse 2s ease-in-out infinite;
 }
@@ -262,7 +258,7 @@ main {
 }
 
 .indicator.recording {
-  color: #ff4444;
+  color: var(--coral-red);
   animation: recording-pulse 1s ease-in-out infinite;
 }
 
@@ -285,20 +281,20 @@ main {
 }
 
 .gesture-info {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(11, 17, 32, 0.6);
   padding: 1.5rem;
-  border-radius: 16px;
+  border-radius: 8px;
   width: 100%;
   max-width: 600px;
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--gold);
 }
 
 .gesture-info h3 {
   margin-top: 0;
   margin-bottom: 1rem;
   font-size: 1.3rem;
-  color: #667eea;
+  color: var(--gold);
 }
 
 .data-grid {
@@ -326,21 +322,22 @@ main {
 .data-item .value {
   font-size: 1.2rem;
   font-weight: bold;
-  color: #667eea;
+  color: var(--teal);
 }
 
 .instructions {
-  background: rgba(102, 126, 234, 0.1);
+  background: rgba(11, 17, 32, 0.6);
   padding: 2rem;
-  border-radius: 16px;
+  border-radius: 8px;
   max-width: 600px;
-  border: 2px solid rgba(102, 126, 234, 0.3);
+  border: 1px solid var(--gold);
 }
 
 .instructions h3 {
   margin-top: 0;
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
   font-size: 1.3rem;
+  color: var(--gold);
 }
 
 .instructions ul {
@@ -352,8 +349,8 @@ main {
 .instructions li {
   padding: 0.75rem 0;
   font-size: 1rem;
-  line-height: 1.5;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  line-height: 1.6;
+  border-bottom: 1px solid rgba(248, 184, 58, 0.2);
 }
 
 .instructions li:last-child {
@@ -361,7 +358,7 @@ main {
 }
 
 .instructions strong {
-  color: #667eea;
+  color: var(--teal);
 }
 
 /* Emotion Detection Display - Simplified Badge */
@@ -480,9 +477,9 @@ main {
 }
 
 .hand-instrument.playing {
-  border-color: #00ff88;
-  background: rgba(0, 255, 136, 0.1);
-  box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+  border-color: var(--teal);
+  background: rgba(76, 194, 180, 0.15);
+  box-shadow: 0 0 20px rgba(76, 194, 180, 0.3);
 }
 
 .hand-label {
@@ -494,11 +491,11 @@ main {
 .instrument-name {
   font-size: 1.1rem;
   font-weight: bold;
-  color: #667eea;
+  color: var(--gold);
 }
 
 .hand-instrument.playing .instrument-name {
-  color: #00ff88;
+  color: var(--teal);
 }
 
 /* Hand-specific gesture data */
@@ -512,7 +509,7 @@ main {
 
 .hand-data h4 {
   margin: 0 0 1rem 0;
-  color: #667eea;
+  color: var(--gold);
   font-size: 1.1rem;
 }
 
@@ -522,8 +519,8 @@ main {
 
 .gesture-detected {
   grid-column: span 2;
-  background: rgba(0, 255, 136, 0.1);
-  border: 1px solid rgba(0, 255, 136, 0.3);
+  background: rgba(76, 194, 180, 0.15);
+  border: 1px solid var(--teal);
   animation: gesture-glow 0.5s ease-out;
 }
 
@@ -539,7 +536,7 @@ main {
 }
 
 .gesture-detected .value {
-  color: #00ff88;
+  color: var(--teal);
   font-size: 1rem;
   text-align: center;
 }
@@ -555,8 +552,8 @@ main {
 }
 
 .webcam-column {
-  flex: 0 0 45%;
-  max-width: 700px;
+  flex: 0 0 50%;
+  max-width: 800px;
 }
 
 .fluid-column {

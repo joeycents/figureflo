@@ -431,7 +431,7 @@ function App() {
   return (
     <div className="App">
       <header>
-        <h1>🎵 FigureFlo</h1>
+        <h1><span style={{ color: 'var(--coral-red)' }}>♪</span> FigureFlo</h1>
         <p>Gesture-Controlled Synthesizer</p>
       </header>
 
