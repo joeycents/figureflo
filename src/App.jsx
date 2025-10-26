@@ -15,17 +15,24 @@ function App() {
   const { handData, isLoading, error } = useHandTracking(videoRef, canvasRef)
   const {
     start,
+    stop,
+    resume,
     triggerAttack,
     triggerRelease,
     setFilterFrequency,
     setReverb,
     setVolume,
+    cycleInstrument,
+    startRecording,
+    stopRecording,
     isStarted,
     isPlaying,
-    isLoaded,
-    instrument,
-    setInstrument,
-    loadError
+    leftPlaying,
+    rightPlaying,
+    isStopped,
+    leftInstrument,
+    rightInstrument,
+    instruments
   } = useSynthesizer()
   
   // Calibration hook
@@ -44,11 +51,25 @@ function App() {
   } = useCalibration(handData, !isLoading && !error)
   
   const [gestureData, setGestureData] = useState(null)
-  const [wasPlaying, setWasPlaying] = useState(false)
   const [loadingProgress, setLoadingProgress] = useState(0)
   const [showLoading, setShowLoading] = useState(true)
   const [isAnimatingComplete, setIsAnimatingComplete] = useState(false)
   const [isAnimatingWebcam, setIsAnimatingWebcam] = useState(false)
+  
+  // Gesture timing states
+  const [bothHandsOpenStartTime, setBothHandsOpenStartTime] = useState(null)
+  const [bothHandsFistStartTime, setBothHandsFistStartTime] = useState(null)
+  const [bothHandsVictoryStartTime, setBothHandsVictoryStartTime] = useState(null)
+  const [leftThumbsUpTime, setLeftThumbsUpTime] = useState(null)
+  const [leftThumbsDownTime, setLeftThumbsDownTime] = useState(null)
+  const [rightThumbsUpTime, setRightThumbsUpTime] = useState(null)
+  const [rightThumbsDownTime, setRightThumbsDownTime] = useState(null)
+  const [isRecording, setIsRecording] = useState(false)
+  const [canPlay, setCanPlay] = useState(false) // Controls whether music can play
+  
+  // Track which hands are playing
+  const [leftWasPlaying, setLeftWasPlaying] = useState(false)
+  const [rightWasPlaying, setRightWasPlaying] = useState(false)
 
   // Progress bar effect - increase to 80% over 8 seconds
   useEffect(() => {
@@ -126,29 +147,165 @@ function App() {
 
     const params = processGestures(handData)
     
-    if (params) {
-      setGestureData(params)
-      
-      // Update filter and reverb continuously
-      setFilterFrequency(params.filterFreq)
-      setReverb(params.reverb)
-      setVolume(params.volume)
-      
-      // Trigger note on pinch
-      if (params.isPinched && !wasPlaying) {
-        triggerAttack(params.note, params.pinch)
-        setWasPlaying(true)
-      } else if (!params.isPinched && wasPlaying) {
-        triggerRelease(params.note)
-        setWasPlaying(false)
-      }
-    } else {
+    if (!params || params.handCount === 0) {
       setGestureData(null)
-      if (wasPlaying) {
-        setWasPlaying(false)
+      // Reset all timing states
+      setBothHandsOpenStartTime(null)
+      setBothHandsFistStartTime(null)
+      setBothHandsVictoryStartTime(null)
+      return
+    }
+
+    setGestureData(params)
+    
+    // Debug logging for victory sign
+    if (params.hands.length === 2) {
+      const hand1Victory = params.hands[0].isVictorySign
+      const hand2Victory = params.hands[1].isVictorySign
+      if (hand1Victory || hand2Victory) {
+        console.log(`Victory debug - Hand 1: ${hand1Victory}, Hand 2: ${hand2Victory}, Both: ${params.bothHandsVictory}`)
       }
     }
-  }, [handData, isStarted, calibrationComplete, wasPlaying, setFilterFrequency, setReverb, setVolume, triggerAttack, triggerRelease])
+    
+    // Check for "both hands victory sign" to enable playing (held for 2 seconds)
+    if (params.bothHandsVictory) {
+      const now = Date.now()
+      if (!bothHandsVictoryStartTime) {
+        setBothHandsVictoryStartTime(now)
+        console.log('✌️ Both hands victory sign detected, hold for 2 seconds to enable playing')
+      } else if (now - bothHandsVictoryStartTime >= 2000) {
+        if (!canPlay) {
+          console.log('✅ Music playing ENABLED!')
+          setCanPlay(true)
+          resume()
+        }
+        setBothHandsVictoryStartTime(null)
+      }
+    } else {
+      setBothHandsVictoryStartTime(null)
+    }
+    
+    // Check for "both hands open" stop gesture (held for 5 seconds)
+    if (params.bothHandsOpen) {
+      const now = Date.now()
+      if (!bothHandsOpenStartTime) {
+        setBothHandsOpenStartTime(now)
+        console.log('🖐️ Both hands open detected, hold for 5 seconds to stop')
+      } else if (now - bothHandsOpenStartTime >= 5000 && canPlay) {
+        console.log('🛑 Stopping music (both hands held open)')
+        stop()
+        setCanPlay(false)
+        setBothHandsOpenStartTime(null)
+      }
+    } else {
+      setBothHandsOpenStartTime(null)
+    }
+
+    // Check for "both hands fist" recording gesture (held for 2 seconds)
+    if (params.bothHandsFist) {
+      const now = Date.now()
+      if (!bothHandsFistStartTime) {
+        setBothHandsFistStartTime(now)
+        console.log('✊ Both fists detected, hold for 2 seconds to start recording')
+      } else if (now - bothHandsFistStartTime >= 2000 && !isRecording) {
+        console.log('🎙️ Starting recording (dummy)')
+        startRecording()
+        setIsRecording(true)
+        setBothHandsFistStartTime(null)
+      }
+    } else {
+      if (bothHandsFistStartTime && isRecording) {
+        console.log('⏹️ Stopping recording (dummy)')
+        stopRecording()
+        setIsRecording(false)
+      }
+      setBothHandsFistStartTime(null)
+    }
+
+    // Process each hand
+    params.hands.forEach((hand) => {
+      const handType = hand.handedness
+      // FIX: Swap the logic - MediaPipe reports Right as Left and vice versa in mirror view
+      const isLeft = handType === 'Right' // Swapped!
+      const wasPlaying = isLeft ? leftWasPlaying : rightWasPlaying
+      const setWasPlaying = isLeft ? setLeftWasPlaying : setRightWasPlaying
+      const actualHandType = isLeft ? 'Left' : 'Right' // Use corrected hand type
+
+      // For gesture tracking, use the physical hand (actualHandType) consistently
+      // Check for thumbs up (cycle instrument up)
+      const currentThumbsUpTime = actualHandType === 'Left' ? leftThumbsUpTime : rightThumbsUpTime
+      if (hand.isThumbsUp && !currentThumbsUpTime) {
+        // Only set time and cycle instrument if we weren't already holding thumbs up
+        if (actualHandType === 'Left') {
+          setLeftThumbsUpTime(Date.now())
+        } else {
+          setRightThumbsUpTime(Date.now())
+        }
+        console.log(`👍 ${actualHandType} hand thumbs up - cycling instrument`)
+        cycleInstrument(actualHandType, 'up')
+      } else if (!hand.isThumbsUp && currentThumbsUpTime) {
+        // Only reset if we were holding thumbs up and now stopped
+        if (actualHandType === 'Left') {
+          setLeftThumbsUpTime(null)
+        } else {
+          setRightThumbsUpTime(null)
+        }
+      }
+
+      // Check for thumbs down (cycle instrument down)
+      const currentThumbsDownTime = actualHandType === 'Left' ? leftThumbsDownTime : rightThumbsDownTime
+      if (hand.isThumbsDown && !currentThumbsDownTime) {
+        // Only set time and cycle instrument if we weren't already holding thumbs down
+        if (actualHandType === 'Left') {
+          setLeftThumbsDownTime(Date.now())
+        } else {
+          setRightThumbsDownTime(Date.now())
+        }
+        console.log(`👎 ${actualHandType} hand thumbs down - cycling instrument`)
+        cycleInstrument(actualHandType, 'down')
+      } else if (!hand.isThumbsDown && currentThumbsDownTime) {
+        // Only reset if we were holding thumbs down and now stopped
+        if (actualHandType === 'Left') {
+          setLeftThumbsDownTime(null)
+        } else {
+          setRightThumbsDownTime(null)
+        }
+      }
+
+      // Skip control gestures if music is not enabled or stopped
+      if (!canPlay || isStopped) return
+
+      // Update filter and reverb continuously
+      setFilterFrequency(actualHandType, hand.filterFreq)
+      setReverb(hand.reverb)
+      setVolume(actualHandType, hand.volume)
+      
+      // Trigger note on pinch
+      if (hand.isPinched && !wasPlaying) {
+        triggerAttack(actualHandType, hand.note, hand.pinch)
+        setWasPlaying(true)
+      } else if (!hand.isPinched && wasPlaying) {
+        triggerRelease(actualHandType, hand.note)
+        setWasPlaying(false)
+      }
+    })
+  }, [
+    handData, 
+    isStarted, 
+    calibrationComplete, 
+    leftWasPlaying, 
+    rightWasPlaying, 
+    isStopped,
+    canPlay,
+    bothHandsOpenStartTime,
+    bothHandsFistStartTime,
+    bothHandsVictoryStartTime,
+    isRecording,
+    leftThumbsUpTime,
+    leftThumbsDownTime,
+    rightThumbsUpTime,
+    rightThumbsDownTime
+  ])
 
   // Green glow effect when gesture is successfully detected during calibration
   useEffect(() => {
@@ -278,78 +435,86 @@ function App() {
 
         {isStarted && calibrationComplete && (
           <div className="status">
-            <div className={`indicator ${isPlaying ? 'active' : ''}`}>
-              {isPlaying ? '🔊 Playing' : '🔇 Silent'}
+            <div className={`indicator ${!canPlay ? 'waiting' : (isStopped ? 'stopped' : (isPlaying ? 'active' : ''))}`}>
+              {!canPlay ? '✌️ Do Victory Sign to Start' : (isStopped ? '🛑 Stopped' : (isPlaying ? '🔊 Playing' : '🔇 Silent'))}
             </div>
-            <div className="controls">
-              <label>
-                Instrument:
-                <select value={instrument} onChange={(e) => setInstrument(e.target.value)}>
-                  <optgroup label="🎛️ Basic Waveforms">
-                    <option value="synth-sine">Sine Wave</option>
-                    <option value="synth-triangle">Triangle Wave</option>
-                    <option value="synth-sawtooth">Sawtooth Wave</option>
-                    <option value="synth-square">Square Wave</option>
-                  </optgroup>
-                  <optgroup label="🎹 Advanced Synths">
-                    <option value="Synth">Synth</option>
-                    <option value="MonoSynth">MonoSynth</option>
-                    <option value="FMSynth">FMSynth</option>
-                    <option value="AMSynth">AMSynth</option>
-                    <option value="DuoSynth">DuoSynth</option>
-                    <option value="PolySynth">PolySynth</option>
-                    <option value="MembraneSynth">MembraneSynth</option>
-                    <option value="MetalSynth">MetalSynth</option>
-                  </optgroup>
-                  <optgroup label="🎻 Acoustic Instruments">
-                    <option value="violin">Violin</option>
-                    <option value="cello">Cello</option>
-                    <option value="bassoon">Bassoon</option>
-                    <option value="guitar-acoustic">Acoustic Guitar</option>
-                  </optgroup>
-                </select>
-              </label>
-              {!isLoaded && !loadError && (
-                <span className="loading"> Loading instrument samples...</span>
-              )}
-              {loadError && (
-                <span className="error" style={{ color: 'red', marginLeft: '10px' }}>
-                  ⚠️ {loadError}
-                </span>
-              )}
+            {isRecording && (
+              <div className="indicator recording">
+                🎙️ Recording (Dummy)
+              </div>
+            )}
+            <div className="instrument-status">
+              <div className={`hand-instrument ${leftPlaying ? 'playing' : ''}`}>
+                <span className="hand-label">👈 Left Hand:</span>
+                <span className="instrument-name">{leftInstrument.name}</span>
+              </div>
+              <div className={`hand-instrument ${rightPlaying ? 'playing' : ''}`}>
+                <span className="hand-label">👉 Right Hand:</span>
+                <span className="instrument-name">{rightInstrument.name}</span>
+              </div>
             </div>
           </div>
         )}
 
         {gestureData && calibrationComplete && (
           <div className="gesture-info">
-            <h3>Gesture Data</h3>
-            <div className="data-grid">
-              <div className="data-item">
-                <span className="label">Note:</span>
-                <span className="value">{gestureData.note || 'N/A'}</span>
+            <h3>Gesture Data ({gestureData.handCount} hand{gestureData.handCount !== 1 ? 's' : ''})</h3>
+            {gestureData.hands.map((hand, index) => (
+              <div key={index} className="hand-data">
+                <h4>{hand.handedness === 'Left' ? '👈' : '👉'} {hand.handedness} Hand</h4>
+                <div className="data-grid">
+                  <div className="data-item">
+                    <span className="label">Note:</span>
+                    <span className="value">{hand.note || 'N/A'}</span>
+                  </div>
+                  <div className="data-item">
+                    <span className="label">Frequency:</span>
+                    <span className="value">{hand.frequency?.toFixed(1)} Hz</span>
+                  </div>
+                  <div className="data-item">
+                    <span className="label">Filter:</span>
+                    <span className="value">{hand.filterFreq?.toFixed(0)} Hz</span>
+                  </div>
+                  <div className="data-item">
+                    <span className="label">Pinch:</span>
+                    <span className="value">{(hand.pinch * 100).toFixed(0)}%</span>
+                  </div>
+                  <div className="data-item">
+                    <span className="label">Reverb:</span>
+                    <span className="value">{(hand.reverb * 100).toFixed(0)}%</span>
+                  </div>
+                  <div className="data-item">
+                    <span className="label">Volume:</span>
+                    <span className="value">{hand.volume.toFixed(1)} dB</span>
+                  </div>
+                  {hand.isThumbsUp && (
+                    <div className="data-item gesture-detected">
+                      <span className="value">👍 Thumbs Up</span>
+                    </div>
+                  )}
+                  {hand.isThumbsDown && (
+                    <div className="data-item gesture-detected">
+                      <span className="value">👎 Thumbs Down</span>
+                    </div>
+                  )}
+                  {hand.isVictorySign && (
+                    <div className="data-item gesture-detected">
+                      <span className="value">✌️ Victory Sign</span>
+                    </div>
+                  )}
+                  {hand.isFist && (
+                    <div className="data-item gesture-detected">
+                      <span className="value">✊ Fist</span>
+                    </div>
+                  )}
+                  {hand.isOpenPalm && (
+                    <div className="data-item gesture-detected">
+                      <span className="value">🖐️ Open Palm</span>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="data-item">
-                <span className="label">Frequency:</span>
-                <span className="value">{gestureData.frequency?.toFixed(1)} Hz</span>
-              </div>
-              <div className="data-item">
-                <span className="label">Filter:</span>
-                <span className="value">{gestureData.filterFreq?.toFixed(0)} Hz</span>
-              </div>
-              <div className="data-item">
-                <span className="label">Pinch:</span>
-                <span className="value">{(gestureData.pinch * 100).toFixed(0)}%</span>
-              </div>
-              <div className="data-item">
-                <span className="label">Reverb:</span>
-                <span className="value">{(gestureData.reverb * 100).toFixed(0)}%</span>
-              </div>
-              <div className="data-item">
-                <span className="label">Volume:</span>
-                <span className="value">{gestureData.volume.toFixed(1)} dB</span>
-              </div>
-            </div>
+            ))}
           </div>
         )}
 
@@ -357,10 +522,15 @@ function App() {
           <h3>How to Play</h3>
           {calibrationComplete ? (
             <ul>
+              <li>✌️✌️ <strong>Both Hands Victory Sign</strong>: Hold for 2 seconds to START playing music</li>
               <li>✋ <strong>Hand Height</strong>: Controls pitch (higher = higher note)</li>
-              <li>↔️ <strong>Hand Position</strong>: Controls filter frequency (left to right)</li>
+              <li>↔️ <strong>Hand Position (Left/Right)</strong>: Controls filter frequency</li>
               <li>🤏 <strong>Pinch</strong>: Trigger notes (thumb + index finger)</li>
               <li>👐 <strong>Hand Openness</strong>: Controls reverb amount</li>
+              <li>👍 <strong>Thumbs Up</strong>: Cycle to next instrument (per hand)</li>
+              <li>👎 <strong>Thumbs Down</strong>: Cycle to previous instrument (per hand)</li>
+              <li>🖐️🖐️ <strong>Both Hands Open</strong>: Hold for 5 seconds to STOP playing</li>
+              <li>✊✊ <strong>Both Fists</strong>: Hold for 2 seconds to record (dummy)</li>
             </ul>
           ) : (
             <ul>

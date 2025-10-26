@@ -241,6 +241,40 @@ main {
   animation: pulse 1.5s ease-in-out infinite;
 }
 
+.indicator.stopped {
+  color: #ff4444;
+  font-weight: bold;
+}
+
+.indicator.waiting {
+  color: #ffb84d;
+  font-weight: bold;
+  animation: waiting-pulse 2s ease-in-out infinite;
+}
+
+@keyframes waiting-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.indicator.recording {
+  color: #ff4444;
+  animation: recording-pulse 1s ease-in-out infinite;
+}
+
+@keyframes recording-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
 @keyframes pulse {
   0%, 100% {
     opacity: 1;
@@ -426,3 +460,86 @@ main {
   }
 }
 
+/* Multi-hand instrument status */
+.instrument-status {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+.hand-instrument {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+}
+
+.hand-instrument.playing {
+  border-color: #00ff88;
+  background: rgba(0, 255, 136, 0.1);
+  box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+}
+
+.hand-label {
+  font-size: 0.9rem;
+  opacity: 0.7;
+  font-weight: 500;
+}
+
+.instrument-name {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #667eea;
+}
+
+.hand-instrument.playing .instrument-name {
+  color: #00ff88;
+}
+
+/* Hand-specific gesture data */
+.hand-data {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.hand-data h4 {
+  margin: 0 0 1rem 0;
+  color: #667eea;
+  font-size: 1.1rem;
+}
+
+.hand-data:last-child {
+  margin-bottom: 0;
+}
+
+.gesture-detected {
+  grid-column: span 2;
+  background: rgba(0, 255, 136, 0.1);
+  border: 1px solid rgba(0, 255, 136, 0.3);
+  animation: gesture-glow 0.5s ease-out;
+}
+
+@keyframes gesture-glow {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.gesture-detected .value {
+  color: #00ff88;
+  font-size: 1rem;
+  text-align: center;
+}
