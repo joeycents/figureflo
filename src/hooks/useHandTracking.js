@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { HandLandmarker, FilesetResolver } from '@mediapipe/tasks-vision'
+import { HandLandmarker, GestureRecognizer, FilesetResolver } from '@mediapipe/tasks-vision'
 
 export const useHandTracking = (videoRef, canvasRef) => {
   const [handData, setHandData] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
   const handLandmarkerRef = useRef(null)
+  const gestureRecognizerRef = useRef(null)
   const animationFrameRef = useRef(null)
 
   useEffect(() => {
@@ -47,6 +48,18 @@ export const useHandTracking = (videoRef, canvasRef) => {
         })
         console.log('Hand landmarker created successfully!')
 
+        // Also create gesture recognizer
+        console.log('Creating gesture recognizer...')
+        gestureRecognizerRef.current = await GestureRecognizer.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task',
+            delegate: 'GPU'
+          },
+          runningMode: 'VIDEO',
+          numHands: 2
+        })
+        console.log('Gesture recognizer created successfully!')
+
         // Wait for video to be ready, then start tracking
         if (videoRef.current) {
           if (videoRef.current.readyState >= 2) {
@@ -66,18 +79,35 @@ export const useHandTracking = (videoRef, canvasRef) => {
     }
 
     const startTracking = () => {
-      if (!videoRef.current || !handLandmarkerRef.current) return
+      if (!videoRef.current || !handLandmarkerRef.current || !gestureRecognizerRef.current) return
 
       const detectHands = async () => {
         if (videoRef.current && videoRef.current.readyState >= 2) {
           const startTimeMs = performance.now()
-          const results = handLandmarkerRef.current.detectForVideo(
+          
+          // Get landmarks from HandLandmarker
+          const landmarkResults = handLandmarkerRef.current.detectForVideo(
             videoRef.current,
             startTimeMs
           )
 
+          // Get gestures from GestureRecognizer
+          const gestureResults = gestureRecognizerRef.current.recognizeForVideo(
+            videoRef.current,
+            startTimeMs
+          )
+
+          // Combine results
+          const combinedResults = {
+            landmarks: landmarkResults.landmarks,
+            worldLandmarks: landmarkResults.worldLandmarks,
+            handedness: landmarkResults.handednesses,
+            gestures: gestureResults.gestures,
+            gestureHandedness: gestureResults.handednesses
+          }
+
           // Draw on canvas
-          if (canvasRef.current && results.landmarks) {
+          if (canvasRef.current && combinedResults.landmarks) {
             const canvas = canvasRef.current
             const ctx = canvas.getContext('2d')
             canvas.width = videoRef.current.videoWidth
@@ -86,7 +116,7 @@ export const useHandTracking = (videoRef, canvasRef) => {
             ctx.clearRect(0, 0, canvas.width, canvas.height)
 
             // Draw landmarks
-            results.landmarks.forEach((landmarks) => {
+            combinedResults.landmarks.forEach((landmarks) => {
               landmarks.forEach((landmark, index) => {
                 const x = landmark.x * canvas.width
                 const y = landmark.y * canvas.height
@@ -111,7 +141,7 @@ export const useHandTracking = (videoRef, canvasRef) => {
             })
           }
 
-          setHandData(results)
+          setHandData(combinedResults)
         }
 
         animationFrameRef.current = requestAnimationFrame(detectHands)
@@ -123,14 +153,37 @@ export const useHandTracking = (videoRef, canvasRef) => {
     initializeHandTracking()
 
     return () => {
+      console.log('Cleaning up hand tracking...')
+      
+      // Stop animation frame
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current)
       }
+      
+      // Stop webcam stream
       if (stream) {
         stream.getTracks().forEach(track => track.stop())
+        console.log('Webcam stream stopped')
       }
+      
+      // Clean up video element
       if (videoRef.current) {
         videoRef.current.removeEventListener('loadeddata', startTracking)
+        videoRef.current.srcObject = null
+      }
+      
+      // Close MediaPipe hand landmarker
+      if (handLandmarkerRef.current) {
+        handLandmarkerRef.current.close()
+        handLandmarkerRef.current = null
+        console.log('MediaPipe hand landmarker closed')
+      }
+
+      // Close MediaPipe gesture recognizer
+      if (gestureRecognizerRef.current) {
+        gestureRecognizerRef.current.close()
+        gestureRecognizerRef.current = null
+        console.log('MediaPipe gesture recognizer closed')
       }
     }
   }, [videoRef, canvasRef])
