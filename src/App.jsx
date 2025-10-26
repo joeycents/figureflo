@@ -20,7 +20,8 @@ function App() {
     isPlaying,
     isLoaded,
     instrument,
-    setInstrument
+    setInstrument,
+    loadError
   } = useSynthesizer()
   
   const [gestureData, setGestureData] = useState(null)
@@ -111,12 +112,37 @@ function App() {
               <label>
                 Instrument:
                 <select value={instrument} onChange={(e) => setInstrument(e.target.value)}>
-                  <option value="piano">Piano</option>
-                  <option value="violin">Violin</option>
+                  <optgroup label="🎛️ Basic Waveforms">
+                    <option value="synth-sine">Sine Wave</option>
+                    <option value="synth-triangle">Triangle Wave</option>
+                    <option value="synth-sawtooth">Sawtooth Wave</option>
+                    <option value="synth-square">Square Wave</option>
+                  </optgroup>
+                  <optgroup label="🎹 Advanced Synths">
+                    <option value="Synth">Synth</option>
+                    <option value="MonoSynth">MonoSynth</option>
+                    <option value="FMSynth">FMSynth</option>
+                    <option value="AMSynth">AMSynth</option>
+                    <option value="DuoSynth">DuoSynth</option>
+                    <option value="PolySynth">PolySynth</option>
+                    <option value="MembraneSynth">MembraneSynth</option>
+                    <option value="MetalSynth">MetalSynth</option>
+                  </optgroup>
+                  <optgroup label="🎻 Acoustic Instruments">
+                    <option value="violin">Violin</option>
+                    <option value="cello">Cello</option>
+                    <option value="bassoon">Bassoon</option>
+                    <option value="guitar-acoustic">Acoustic Guitar</option>
+                  </optgroup>
                 </select>
               </label>
-              {!isLoaded && (
+              {!isLoaded && !loadError && (
                 <span className="loading"> Loading instrument samples...</span>
+              )}
+              {loadError && (
+                <span className="error" style={{ color: 'red', marginLeft: '10px' }}>
+                  ⚠️ {loadError}
+                </span>
               )}
             </div>
           </div>
