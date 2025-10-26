@@ -122,14 +122,14 @@ export const useHandTracking = (videoRef, canvasRef) => {
                 const y = landmark.y * canvas.height
 
                 // Draw point
-                ctx.fillStyle = '#00ff00'
+                ctx.fillStyle = '#F8B83A'
                 ctx.beginPath()
                 ctx.arc(x, y, 5, 0, 2 * Math.PI)
                 ctx.fill()
 
                 // Draw connections
                 if (index > 0) {
-                  ctx.strokeStyle = '#00ff00'
+                  ctx.strokeStyle = '#F8B83A'
                   ctx.lineWidth = 2
                   ctx.beginPath()
                   const prevLandmark = landmarks[index - 1]

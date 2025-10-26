@@ -16,18 +16,23 @@ const CalibrationOverlay = ({
   showSuccessAnimation,
   allSteps,
   canSkip,
-  onSkip
+  onSkip,
+  onExit
 }) => {
   return (
-    <div className="calibration-overlay">
-      <div className="calibration-container">
-        {/* Header */}
-        <div className="calibration-header">
-          <h2>🎯 Gesture Calibration</h2>
-          <p className="calibration-subtitle">
-            Complete these gestures to unlock FigureFlo
-          </p>
-        </div>
+    <>
+      {/* Exit Button */}
+      <button className="exit-button" onClick={onExit} title="Skip calibration">
+        ×
+      </button>
+
+      {/* Header */}
+      <div className="calibration-header">
+        <h2>Gesture Calibration</h2>
+        <p className="calibration-subtitle">
+          Complete these gestures to unlock FigureFlo
+        </p>
+      </div>
 
         {/* Progress Bar */}
         <div className="calibration-progress-bar">
@@ -82,19 +87,18 @@ const CalibrationOverlay = ({
 
         {/* Help Text */}
         <div className="calibration-help">
-          <p>💡 Tip: Hold each gesture steady until the progress bar fills</p>
+          <p>Tip: Hold each gesture steady until the progress bar fills</p>
         </div>
 
-        {/* Skip Button (appears after 10 seconds) */}
-        {canSkip && (
-          <div className="skip-button-container">
-            <button className="skip-button" onClick={onSkip}>
-              Skip This Step →
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
+      {/* Skip Button (appears after 10 seconds) */}
+      {canSkip && (
+        <div className="skip-button-container">
+          <button className="skip-button" onClick={onSkip}>
+            Skip This Step →
+          </button>
+        </div>
+      )}
+    </>
   )
 }
 

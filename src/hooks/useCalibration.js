@@ -81,6 +81,11 @@ export const useCalibration = (handData, enabled = true) => {
     }
   }, [currentStepIndex, totalSteps])
 
+  // Skip all calibration (exit button)
+  const skipAllCalibration = useCallback(() => {
+    setIsComplete(true)
+  }, [])
+
   // Initialize step start time when step changes
   useEffect(() => {
     if (enabled && !isComplete) {
@@ -174,6 +179,7 @@ export const useCalibration = (handData, enabled = true) => {
     detectedGestures,
     resetCalibration,
     skipCurrentStep,
+    skipAllCalibration,
     canSkip,
     allSteps: CALIBRATION_STEPS
   }

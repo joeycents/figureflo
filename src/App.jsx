@@ -36,7 +36,8 @@ function App() {
     showSuccessAnimation,
     allSteps,
     canSkip,
-    skipCurrentStep
+    skipCurrentStep,
+    skipAllCalibration
   } = useCalibration(handData, !isLoading && !error)
   
   const [gestureData, setGestureData] = useState(null)
@@ -44,7 +45,6 @@ function App() {
   const [loadingProgress, setLoadingProgress] = useState(0)
   const [showLoading, setShowLoading] = useState(true)
   const [isAnimatingComplete, setIsAnimatingComplete] = useState(false)
-  const [isAnimatingWebcam, setIsAnimatingWebcam] = useState(false)
 
   // Progress bar effect - increase to 80% over 8 seconds
   useEffect(() => {
@@ -184,36 +184,11 @@ function App() {
     }
   }, [showSuccessAnimation])
 
-  // Handle calibration completion with webcam animation
-  useEffect(() => {
-    if (calibrationComplete && !isAnimatingWebcam) {
-      setIsAnimatingWebcam(true)
-      
-      // Add slide animation class when video container appears
-      setTimeout(() => {
-        if (videoContainerRef.current) {
-          videoContainerRef.current.classList.add('slide-to-position')
-        }
-      }, 100)
-    }
-  }, [calibrationComplete, isAnimatingWebcam])
 
   return (
     <div className="App">
-      <header>
-        <h1>🎵 FigureFlo</h1>
-        <p>Gesture-Controlled Synthesizer</p>
-      </header>
-
-      <main>
-        {error && (
-          <div className="error">
-            <p>❌ Error: {error}</p>
-            <p>Please allow camera access to use FigureFlo</p>
-          </div>
-        )}
-
-        {showLoading && (
+      {showLoading && (
+        <div className="loading-fullscreen">
           <div className="loading">
             <p>{loadingProgress >= 80 ? 'Almost there...' : 'Initializing application...'}</p>
             <div className="progress-bar-container">
@@ -223,6 +198,20 @@ function App() {
               />
             </div>
             <p className="progress-text">{loadingProgress.toFixed(0)}%</p>
+          </div>
+        </div>
+      )}
+
+      <header>
+        <h1> FigureFlo</h1>
+        <p>Gesture-Controlled Synthesizer</p>
+      </header>
+
+      <main>
+        {error && (
+          <div className="error">
+            <p>❌ Error: {error}</p>
+            <p>Please allow camera access to use FigureFlo</p>
           </div>
         )}
 
@@ -273,86 +262,89 @@ function App() {
           />
         </div>
 
-        {/* Calibration Overlay - overlays on top of video */}
-        {!showLoading && !calibrationComplete && !error && (
-          <CalibrationOverlay
-            currentStep={currentStep}
-            currentStepIndex={currentStepIndex}
-            totalSteps={totalSteps}
-            progressPercentage={progressPercentage}
-            gestureHoldProgress={gestureHoldProgress}
-            isHoldingGesture={isHoldingGesture}
-            showSuccessAnimation={showSuccessAnimation}
-            allSteps={allSteps}
-            canSkip={canSkip}
-            onSkip={skipCurrentStep}
-          />
-        )}
+        {/* Calibration Overlay or Gesture Data Panel - same position */}
+        {!showLoading && !error && (
+          <div className="right-panel">
+            {!calibrationComplete ? (
+              <CalibrationOverlay
+                currentStep={currentStep}
+                currentStepIndex={currentStepIndex}
+                totalSteps={totalSteps}
+                progressPercentage={progressPercentage}
+                gestureHoldProgress={gestureHoldProgress}
+                isHoldingGesture={isHoldingGesture}
+                showSuccessAnimation={showSuccessAnimation}
+                allSteps={allSteps}
+                canSkip={canSkip}
+                onSkip={skipCurrentStep}
+                onExit={skipAllCalibration}
+              />
+            ) : (
+              <>
+                <div className="panel-header">
+                  <h3>Gesture Data</h3>
+                  <div className="help-icon">?</div>
+                </div>
+                
+                <div className="panel-content">
+                  <div className="gesture-data-view">
+                    <table className="data-table">
+                      <tbody>
+                        <tr>
+                          <td className="label">Status</td>
+                          <td className={`value ${isPlaying ? 'active' : ''}`}>
+                            {isPlaying ? 'Playing' : 'Silent'}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="label">Note</td>
+                          <td className="value">{gestureData?.note || '-'}</td>
+                        </tr>
+                        <tr>
+                          <td className="label">Frequency</td>
+                          <td className="value">{gestureData?.frequency ? `${gestureData.frequency.toFixed(1)} Hz` : '-'}</td>
+                        </tr>
+                        <tr>
+                          <td className="label">Filter</td>
+                          <td className="value">{gestureData?.filterFreq ? `${gestureData.filterFreq.toFixed(0)} Hz` : '-'}</td>
+                        </tr>
+                        <tr>
+                          <td className="label">Pinch</td>
+                          <td className="value">{gestureData?.pinch ? `${(gestureData.pinch * 100).toFixed(0)}%` : '-'}</td>
+                        </tr>
+                        <tr>
+                          <td className="label">Reverb</td>
+                          <td className="value">{gestureData?.reverb ? `${(gestureData.reverb * 100).toFixed(0)}%` : '-'}</td>
+                        </tr>
+                        <tr>
+                          <td className="label">Volume</td>
+                          <td className="value">{gestureData?.volume ? `${gestureData.volume.toFixed(1)} dB` : '-'}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
 
-        {!isStarted && !showLoading && calibrationComplete && (
-          <button onClick={handleStart} className="start-button">
-            🎹 Start Synthesizer
-          </button>
-        )}
+                  <div className="help-view">
+                    <div className="help-content">
+                      <ul>
+                        <li><strong>Hand Height</strong>: Controls pitch (higher = higher note)</li>
+                        <li><strong>Hand Position</strong>: Controls filter frequency (left to right)</li>
+                        <li><strong>Pinch</strong>: Trigger notes (thumb + index finger)</li>
+                        <li><strong>Hand Openness</strong>: Controls reverb amount</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
 
-        {isStarted && calibrationComplete && (
-          <div className="status">
-            <div className={`indicator ${isPlaying ? 'active' : ''}`}>
-              {isPlaying ? '🔊 Playing' : '🔇 Silent'}
-            </div>
+                {!isStarted && (
+                  <button onClick={handleStart} className="start-button">
+                    Start Synthesizer
+                  </button>
+                )}
+              </>
+            )}
           </div>
         )}
-
-        {gestureData && calibrationComplete && (
-          <div className="gesture-info">
-            <h3>Gesture Data</h3>
-            <div className="data-grid">
-              <div className="data-item">
-                <span className="label">Note:</span>
-                <span className="value">{gestureData.note || 'N/A'}</span>
-              </div>
-              <div className="data-item">
-                <span className="label">Frequency:</span>
-                <span className="value">{gestureData.frequency?.toFixed(1)} Hz</span>
-              </div>
-              <div className="data-item">
-                <span className="label">Filter:</span>
-                <span className="value">{gestureData.filterFreq?.toFixed(0)} Hz</span>
-              </div>
-              <div className="data-item">
-                <span className="label">Pinch:</span>
-                <span className="value">{(gestureData.pinch * 100).toFixed(0)}%</span>
-              </div>
-              <div className="data-item">
-                <span className="label">Reverb:</span>
-                <span className="value">{(gestureData.reverb * 100).toFixed(0)}%</span>
-              </div>
-              <div className="data-item">
-                <span className="label">Volume:</span>
-                <span className="value">{gestureData.volume.toFixed(1)} dB</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="instructions">
-          <h3>How to Play</h3>
-          {calibrationComplete ? (
-            <ul>
-              <li>✋ <strong>Hand Height</strong>: Controls pitch (higher = higher note)</li>
-              <li>↔️ <strong>Hand Position</strong>: Controls filter frequency (left to right)</li>
-              <li>🤏 <strong>Pinch</strong>: Trigger notes (thumb + index finger)</li>
-              <li>👐 <strong>Hand Openness</strong>: Controls reverb amount</li>
-            </ul>
-          ) : (
-            <ul>
-              <li>📹 <strong>Complete calibration</strong> to unlock the synthesizer</li>
-              <li>🖐️ <strong>Follow the instructions</strong> above to perform each gesture</li>
-              <li>⏱️ <strong>Hold each gesture</strong> until the progress bar fills</li>
-              <li>✨ <strong>Watch for the green glow</strong> when you succeed!</li>
-            </ul>
-          )}
-        </div>
       </main>
     </div>
   )
