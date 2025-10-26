@@ -3,11 +3,14 @@ import './App.css'
 import { useHandTracking } from './hooks/useHandTracking'
 import { useSynthesizer } from './hooks/useSynthesizer'
 import { useEmotionDetection } from './hooks/useEmotionDetection'
+import { useCalibration } from './hooks/useCalibration'
 import { processGestures } from './utils/gestureMapping'
+import CalibrationOverlay from './components/CalibrationOverlay'
 
 function App() {
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
+  const videoContainerRef = useRef(null)
   
   const { handData, isLoading, error } = useHandTracking(videoRef, canvasRef)
   const {
@@ -21,8 +24,112 @@ function App() {
     isPlaying
   } = useSynthesizer()
   
+  // Calibration hook
+  const {
+    currentStep,
+    currentStepIndex,
+    totalSteps,
+    progressPercentage,
+    gestureHoldProgress,
+    isHoldingGesture,
+    isComplete: calibrationComplete,
+    showSuccessAnimation,
+    allSteps,
+    canSkip,
+    skipCurrentStep
+  } = useCalibration(handData, !isLoading && !error)
+  
   const [gestureData, setGestureData] = useState(null)
   const [wasPlaying, setWasPlaying] = useState(false)
+  const [loadingProgress, setLoadingProgress] = useState(0)
+  const [showLoading, setShowLoading] = useState(true)
+  const [isAnimatingComplete, setIsAnimatingComplete] = useState(false)
+  const [isAnimatingWebcam, setIsAnimatingWebcam] = useState(false)
+
+  // Progress bar effect - increase to 80% over 8 seconds
+  useEffect(() => {
+    if (isLoading && !error) {
+      console.log('🚀 Starting loading animation')
+      setShowLoading(true)
+      setLoadingProgress(0)
+      setIsAnimatingComplete(false)
+      
+      const startTime = Date.now()
+      const duration = 8000 // 8 seconds
+      const targetProgress = 80
+      
+      const interval = setInterval(() => {
+        const elapsed = Date.now() - startTime
+        const progress = Math.min((elapsed / duration) * targetProgress, targetProgress)
+        setLoadingProgress(progress)
+      }, 50)
+      
+      return () => {
+        console.log('🧹 Cleaning up loading interval')
+        clearInterval(interval)
+      }
+    }
+  }, [isLoading, error])
+
+  // Handle completion animation when loading finishes
+  useEffect(() => {
+    if (!isLoading && !error && showLoading && !isAnimatingComplete) {
+      console.log('✅ MediaPipe loaded! Starting completion animation from progress:', loadingProgress)
+      setIsAnimatingComplete(true)
+      
+      // First, ensure we reach at least 80% if we're below it
+      const minimumProgress = Math.max(loadingProgress, 80)
+      let currentProgress = loadingProgress
+      
+      // Quick catch-up to 80% if needed (200ms)
+      if (currentProgress < 80) {
+        console.log('⚡ Fast-forwarding to 80%')
+        const catchUpInterval = setInterval(() => {
+          currentProgress += (80 - loadingProgress) / 10
+          if (currentProgress >= 80) {
+            currentProgress = 80
+            clearInterval(catchUpInterval)
+            console.log('📍 Reached 80%, now filling to 100%')
+          }
+          setLoadingProgress(currentProgress)
+        }, 20)
+        
+        // After catch-up, animate to 100%
+        setTimeout(() => {
+          animateToHundred(80)
+        }, 200)
+      } else {
+        // Already at/past 80%, go straight to 100%
+        animateToHundred(currentProgress)
+      }
+      
+      function animateToHundred(startProgress) {
+        console.log('🎯 Animating from', startProgress, 'to 100%')
+        const targetProgress = 100
+        const fillDuration = 400 // 400ms to fill to 100%
+        const startTime = Date.now()
+        
+        const fillInterval = setInterval(() => {
+          const elapsed = Date.now() - startTime
+          const progress = startProgress + ((targetProgress - startProgress) * (elapsed / fillDuration))
+          
+          if (progress >= 100) {
+            setLoadingProgress(100)
+            clearInterval(fillInterval)
+            console.log('💯 Reached 100%! Playing pop animation')
+          } else {
+            setLoadingProgress(progress)
+          }
+        }, 16)
+        
+        // After fill animation (400ms) + pop animation (600ms) + buffer (400ms) = 1400ms
+        setTimeout(() => {
+          console.log('🎉 Animation complete, hiding loading screen')
+          setShowLoading(false)
+        }, 1400)
+      }
+    }
+  }, [isLoading, error, showLoading, isAnimatingComplete, loadingProgress])
 
   // Emotion detection (enabled after synthesizer starts)
   const { emotions, isProcessing: isProcessingEmotion, error: emotionError, hasApiKey } = useEmotionDetection(videoRef, isStarted)
@@ -34,7 +141,7 @@ function App() {
 
   // Process gestures and control synthesizer
   useEffect(() => {
-    if (!handData || !isStarted) return
+    if (!handData || !isStarted || !calibrationComplete) return
 
     const params = processGestures(handData)
     
@@ -60,7 +167,36 @@ function App() {
         setWasPlaying(false)
       }
     }
-  }, [handData, isStarted, wasPlaying, setFilterFrequency, setReverb, setVolume, triggerAttack, triggerRelease])
+  }, [handData, isStarted, calibrationComplete, wasPlaying, setFilterFrequency, setReverb, setVolume, triggerAttack, triggerRelease])
+
+  // Green glow effect when gesture is successfully detected during calibration
+  useEffect(() => {
+    if (showSuccessAnimation && videoContainerRef.current) {
+      videoContainerRef.current.classList.add('gesture-success')
+      
+      const timer = setTimeout(() => {
+        if (videoContainerRef.current) {
+          videoContainerRef.current.classList.remove('gesture-success')
+        }
+      }, 800)
+      
+      return () => clearTimeout(timer)
+    }
+  }, [showSuccessAnimation])
+
+  // Handle calibration completion with webcam animation
+  useEffect(() => {
+    if (calibrationComplete && !isAnimatingWebcam) {
+      setIsAnimatingWebcam(true)
+      
+      // Add slide animation class when video container appears
+      setTimeout(() => {
+        if (videoContainerRef.current) {
+          videoContainerRef.current.classList.add('slide-to-position')
+        }
+      }, 100)
+    }
+  }, [calibrationComplete, isAnimatingWebcam])
 
   return (
     <div className="App">
@@ -77,9 +213,16 @@ function App() {
           </div>
         )}
 
-        {isLoading && (
+        {showLoading && (
           <div className="loading">
-            <p>Loading MediaPipe hand tracking...</p>
+            <p>{loadingProgress >= 80 ? 'Almost there...' : 'Initializing application...'}</p>
+            <div className="progress-bar-container">
+              <div 
+                className={`progress-bar-fill ${loadingProgress >= 100 ? 'complete' : ''}`}
+                style={{ width: `${loadingProgress}%` }}
+              />
+            </div>
+            <p className="progress-text">{loadingProgress.toFixed(0)}%</p>
           </div>
         )}
 
@@ -98,28 +241,61 @@ function App() {
           </div>
         )}
 
-        <div className="video-container">
-
+        {/* Hidden video/canvas during loading - needed for MediaPipe to initialize */}
+        <div 
+          ref={videoContainerRef}
+          className="video-container"
+          style={{ 
+            position: showLoading ? 'absolute' : 'relative',
+            visibility: showLoading ? 'hidden' : 'visible',
+            width: '100%',
+            maxWidth: '800px'
+          }}
+        >
           <video
             ref={videoRef}
             autoPlay
             playsInline
             muted
-            className="video-feed"
+            style={{ width: '100%', display: 'block', transform: 'scaleX(-1)' }}
           />
           <canvas
             ref={canvasRef}
-            className="canvas-overlay"
+            style={{ 
+              position: 'absolute', 
+              top: 0, 
+              left: 0, 
+              width: '100%', 
+              height: '100%',
+              transform: 'scaleX(-1)',
+              pointerEvents: 'none'
+            }}
           />
         </div>
 
-        {!isStarted && !isLoading && (
+        {/* Calibration Overlay - overlays on top of video */}
+        {!showLoading && !calibrationComplete && !error && (
+          <CalibrationOverlay
+            currentStep={currentStep}
+            currentStepIndex={currentStepIndex}
+            totalSteps={totalSteps}
+            progressPercentage={progressPercentage}
+            gestureHoldProgress={gestureHoldProgress}
+            isHoldingGesture={isHoldingGesture}
+            showSuccessAnimation={showSuccessAnimation}
+            allSteps={allSteps}
+            canSkip={canSkip}
+            onSkip={skipCurrentStep}
+          />
+        )}
+
+        {!isStarted && !showLoading && calibrationComplete && (
           <button onClick={handleStart} className="start-button">
             🎹 Start Synthesizer
           </button>
         )}
 
-        {isStarted && (
+        {isStarted && calibrationComplete && (
           <div className="status">
             <div className={`indicator ${isPlaying ? 'active' : ''}`}>
               {isPlaying ? '🔊 Playing' : '🔇 Silent'}
@@ -127,7 +303,7 @@ function App() {
           </div>
         )}
 
-        {gestureData && (
+        {gestureData && calibrationComplete && (
           <div className="gesture-info">
             <h3>Gesture Data</h3>
             <div className="data-grid">
@@ -161,12 +337,21 @@ function App() {
 
         <div className="instructions">
           <h3>How to Play</h3>
-          <ul>
-            <li>✋ <strong>Hand Height</strong>: Controls pitch (higher = higher note)</li>
-            <li>↔️ <strong>Hand Position</strong>: Controls filter frequency (left to right)</li>
-            <li>🤏 <strong>Pinch</strong>: Trigger notes (thumb + index finger)</li>
-            <li>👐 <strong>Hand Openness</strong>: Controls reverb amount</li>
-          </ul>
+          {calibrationComplete ? (
+            <ul>
+              <li>✋ <strong>Hand Height</strong>: Controls pitch (higher = higher note)</li>
+              <li>↔️ <strong>Hand Position</strong>: Controls filter frequency (left to right)</li>
+              <li>🤏 <strong>Pinch</strong>: Trigger notes (thumb + index finger)</li>
+              <li>👐 <strong>Hand Openness</strong>: Controls reverb amount</li>
+            </ul>
+          ) : (
+            <ul>
+              <li>📹 <strong>Complete calibration</strong> to unlock the synthesizer</li>
+              <li>🖐️ <strong>Follow the instructions</strong> above to perform each gesture</li>
+              <li>⏱️ <strong>Hold each gesture</strong> until the progress bar fills</li>
+              <li>✨ <strong>Watch for the green glow</strong> when you succeed!</li>
+            </ul>
+          )}
         </div>
       </main>
     </div>
