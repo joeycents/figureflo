@@ -12,28 +12,28 @@ const CALIBRATION_STEPS = [
     title: 'Two Palms Out',
     description: 'Show both palms with all fingers extended',
     emoji: '🖐️🖐️',
-    holdDuration: 1500 // ms to hold gesture
+    holdDuration: 200 // ms to hold gesture
   },
   {
     id: 'twoFists',
     title: 'Two Fists',
     description: 'Make fists with both hands',
     emoji: '✊✊',
-    holdDuration: 1500
+    holdDuration: 200
   },
   {
     id: 'victorySignRight',
     title: 'Victory Sign (Right Hand)',
     description: 'Make a peace sign with your right hand',
     emoji: '✌️',
-    holdDuration: 1500
+    holdDuration: 200
   },
   {
     id: 'thumbsUpLeft',
     title: 'Thumbs Up (Left Hand)',
     description: 'Give a thumbs up with your left hand',
     emoji: '👍',
-    holdDuration: 1500
+    holdDuration: 200
   }
 ]
 
