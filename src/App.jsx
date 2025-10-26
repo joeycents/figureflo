@@ -49,7 +49,6 @@ function App() {
   // Progress bar effect - increase to 80% over 8 seconds
   useEffect(() => {
     if (isLoading && !error) {
-      console.log('🚀 Starting loading animation')
       setShowLoading(true)
       setLoadingProgress(0)
       setIsAnimatingComplete(false)
@@ -64,70 +63,48 @@ function App() {
         setLoadingProgress(progress)
       }, 50)
       
-      return () => {
-        console.log('🧹 Cleaning up loading interval')
-        clearInterval(interval)
-      }
+      return () => clearInterval(interval)
     }
   }, [isLoading, error])
 
   // Handle completion animation when loading finishes
   useEffect(() => {
     if (!isLoading && !error && showLoading && !isAnimatingComplete) {
-      console.log('✅ MediaPipe loaded! Starting completion animation from progress:', loadingProgress)
       setIsAnimatingComplete(true)
       
-      // First, ensure we reach at least 80% if we're below it
-      const minimumProgress = Math.max(loadingProgress, 80)
-      let currentProgress = loadingProgress
-      
-      // Quick catch-up to 80% if needed (200ms)
-      if (currentProgress < 80) {
-        console.log('⚡ Fast-forwarding to 80%')
-        const catchUpInterval = setInterval(() => {
-          currentProgress += (80 - loadingProgress) / 10
-          if (currentProgress >= 80) {
-            currentProgress = 80
-            clearInterval(catchUpInterval)
-            console.log('📍 Reached 80%, now filling to 100%')
-          }
-          setLoadingProgress(currentProgress)
-        }, 20)
-        
-        // After catch-up, animate to 100%
-        setTimeout(() => {
-          animateToHundred(80)
-        }, 200)
-      } else {
-        // Already at/past 80%, go straight to 100%
-        animateToHundred(currentProgress)
-      }
-      
-      function animateToHundred(startProgress) {
-        console.log('🎯 Animating from', startProgress, 'to 100%')
-        const targetProgress = 100
-        const fillDuration = 400 // 400ms to fill to 100%
+      const animateCompletion = () => {
+        let currentProgress = Math.max(loadingProgress, 80)
         const startTime = Date.now()
+        const catchUpDuration = currentProgress < 80 ? 200 : 0
+        const fillDuration = 400
         
-        const fillInterval = setInterval(() => {
+        const animate = () => {
           const elapsed = Date.now() - startTime
-          const progress = startProgress + ((targetProgress - startProgress) * (elapsed / fillDuration))
           
-          if (progress >= 100) {
-            setLoadingProgress(100)
-            clearInterval(fillInterval)
-            console.log('💯 Reached 100%! Playing pop animation')
-          } else {
-            setLoadingProgress(progress)
+          // Phase 1: Catch up to 80% if needed (0-200ms)
+          if (elapsed < catchUpDuration) {
+            const catchUpProgress = 80 * (elapsed / catchUpDuration)
+            setLoadingProgress(Math.max(loadingProgress, catchUpProgress))
+            requestAnimationFrame(animate)
           }
-        }, 16)
+          // Phase 2: Animate from 80% to 100% (200-600ms)
+          else if (elapsed < catchUpDuration + fillDuration) {
+            const fillElapsed = elapsed - catchUpDuration
+            const fillProgress = 80 + (20 * (fillElapsed / fillDuration))
+            setLoadingProgress(Math.min(fillProgress, 100))
+            requestAnimationFrame(animate)
+          }
+          // Phase 3: Complete
+          else {
+            setLoadingProgress(100)
+            setTimeout(() => setShowLoading(false), 1400)
+          }
+        }
         
-        // After fill animation (400ms) + pop animation (600ms) + buffer (400ms) = 1400ms
-        setTimeout(() => {
-          console.log('🎉 Animation complete, hiding loading screen')
-          setShowLoading(false)
-        }, 1400)
+        requestAnimationFrame(animate)
       }
+      
+      animateCompletion()
     }
   }, [isLoading, error, showLoading, isAnimatingComplete, loadingProgress])
 

@@ -15,25 +15,20 @@ export const useHandTracking = (videoRef, canvasRef) => {
     const initializeHandTracking = async () => {
       try {
         setIsLoading(true)
-        console.log('Starting hand tracking initialization...')
 
         // Request webcam access first (this triggers the browser prompt)
-        console.log('Requesting webcam access...')
         stream = await navigator.mediaDevices.getUserMedia({
           video: { width: 1280, height: 720 }
         })
-        console.log('Webcam access granted!')
 
         if (videoRef.current) {
           videoRef.current.srcObject = stream
         }
 
         // Now initialize MediaPipe in parallel
-        console.log('Loading MediaPipe models...')
         const vision = await FilesetResolver.forVisionTasks(
           'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
         )
-        console.log('MediaPipe wasm loaded, creating hand landmarker...')
 
         handLandmarkerRef.current = await HandLandmarker.createFromOptions(vision, {
           baseOptions: {
@@ -46,10 +41,8 @@ export const useHandTracking = (videoRef, canvasRef) => {
           minHandPresenceConfidence: 0.5,
           minTrackingConfidence: 0.5
         })
-        console.log('Hand landmarker created successfully!')
 
         // Also create gesture recognizer
-        console.log('Creating gesture recognizer...')
         gestureRecognizerRef.current = await GestureRecognizer.createFromOptions(vision, {
           baseOptions: {
             modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task',
@@ -58,7 +51,6 @@ export const useHandTracking = (videoRef, canvasRef) => {
           runningMode: 'VIDEO',
           numHands: 2
         })
-        console.log('Gesture recognizer created successfully!')
 
         // Wait for video to be ready, then start tracking
         if (videoRef.current) {
@@ -70,7 +62,6 @@ export const useHandTracking = (videoRef, canvasRef) => {
         }
 
         setIsLoading(false)
-        console.log('Hand tracking fully initialized!')
       } catch (err) {
         console.error('Error initializing hand tracking:', err)
         setError(err.message || 'Failed to initialize hand tracking')
@@ -153,8 +144,6 @@ export const useHandTracking = (videoRef, canvasRef) => {
     initializeHandTracking()
 
     return () => {
-      console.log('Cleaning up hand tracking...')
-      
       // Stop animation frame
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current)
@@ -163,7 +152,6 @@ export const useHandTracking = (videoRef, canvasRef) => {
       // Stop webcam stream
       if (stream) {
         stream.getTracks().forEach(track => track.stop())
-        console.log('Webcam stream stopped')
       }
       
       // Clean up video element
@@ -176,14 +164,12 @@ export const useHandTracking = (videoRef, canvasRef) => {
       if (handLandmarkerRef.current) {
         handLandmarkerRef.current.close()
         handLandmarkerRef.current = null
-        console.log('MediaPipe hand landmarker closed')
       }
 
       // Close MediaPipe gesture recognizer
       if (gestureRecognizerRef.current) {
         gestureRecognizerRef.current.close()
         gestureRecognizerRef.current = null
-        console.log('MediaPipe gesture recognizer closed')
       }
     }
   }, [videoRef, canvasRef])

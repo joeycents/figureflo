@@ -295,7 +295,7 @@ export const detectCalibrationGestures = (handData) => {
     }
   }
   
-  const { landmarks, handedness, gestures } = handData
+  const { landmarks, handedness, gestures, gestureHandedness } = handData
   
   // Use MediaPipe's built-in gesture recognition when available
   let twoPalmsOut = detectTwoPalmsOut(landmarks, handedness)
@@ -310,22 +310,27 @@ export const detectCalibrationGestures = (handData) => {
     let closedFistCount = 0
     let victoryDetected = false
     let thumbsUpDetected = false
-
+    
     gestures.forEach((gestureList, index) => {
       if (gestureList && gestureList.length > 0) {
         const gesture = gestureList[0]
-        const hand = handedness && handedness[index] ? handedness[index].categoryName : null
+        const handednessItem = gestureHandedness && gestureHandedness[index] ? gestureHandedness[index][0] : null
+        const hand = handednessItem ? handednessItem.categoryName : null
         
         if (gesture.categoryName === 'Open_Palm') {
           openPalmCount++
         } else if (gesture.categoryName === 'Closed_Fist') {
           closedFistCount++
-        } else if (gesture.categoryName === 'Victory' && hand === 'Right') {
-          victoryDetected = true
-          victorySignRight = { detected: true, confidence: gesture.score }
-        } else if (gesture.categoryName === 'Thumb_Up' && hand === 'Left') {
-          thumbsUpDetected = true
-          thumbsUpLeft = { detected: true, confidence: gesture.score }
+        } else if (gesture.categoryName === 'Victory') {
+          if (hand === 'Right') {
+            victoryDetected = true
+            victorySignRight = { detected: true, confidence: gesture.score }
+          }
+        } else if (gesture.categoryName === 'Thumb_Up') {
+          if (hand === 'Left') {
+            thumbsUpDetected = true
+            thumbsUpLeft = { detected: true, confidence: gesture.score }
+          }
         }
       }
     })
