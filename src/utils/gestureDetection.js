@@ -295,7 +295,7 @@ export const detectCalibrationGestures = (handData) => {
     }
   }
   
-  const { landmarks, handedness, gestures } = handData
+  const { landmarks, handedness, gestures, gestureHandedness } = handData
   
   // Use MediaPipe's built-in gesture recognition when available
   let twoPalmsOut = detectTwoPalmsOut(landmarks, handedness)
@@ -311,21 +311,50 @@ export const detectCalibrationGestures = (handData) => {
     let victoryDetected = false
     let thumbsUpDetected = false
 
+    console.log('🔍 Detected gestures:', gestures.map((g, i) => ({
+      hand: gestureHandedness && gestureHandedness[i] ? gestureHandedness[i].categoryName : 'unknown',
+      gesture: g && g.length > 0 ? g[0].categoryName : 'none',
+      score: g && g.length > 0 ? g[0].score : 0
+    })))
+    
+    console.log('🖐️ Full gestureHandedness array:', gestureHandedness)
+    if (gestureHandedness && gestureHandedness[0]) {
+      console.log('🖐️ First handedness item structure:', gestureHandedness[0])
+      if (gestureHandedness[0][0]) {
+        console.log('🖐️ First handedness [0][0]:', gestureHandedness[0][0])
+      }
+    }
+
     gestures.forEach((gestureList, index) => {
       if (gestureList && gestureList.length > 0) {
         const gesture = gestureList[0]
-        const hand = handedness && handedness[index] ? handedness[index].categoryName : null
+        const handednessItem = gestureHandedness && gestureHandedness[index] ? gestureHandedness[index][0] : null
+        const hand = handednessItem ? handednessItem.categoryName : null
+        
+        console.log(`👋 Hand ${index}: ${hand} - Gesture: ${gesture.categoryName} (${gesture.score.toFixed(2)})`)
         
         if (gesture.categoryName === 'Open_Palm') {
           openPalmCount++
         } else if (gesture.categoryName === 'Closed_Fist') {
           closedFistCount++
-        } else if (gesture.categoryName === 'Victory' && hand === 'Right') {
-          victoryDetected = true
-          victorySignRight = { detected: true, confidence: gesture.score }
-        } else if (gesture.categoryName === 'Thumb_Up' && hand === 'Left') {
-          thumbsUpDetected = true
-          thumbsUpLeft = { detected: true, confidence: gesture.score }
+        } else if (gesture.categoryName === 'Victory') {
+          console.log(`✌️ Victory detected! Hand is: "${hand}" (checking for "Right")`)
+          if (hand === 'Right') {
+            victoryDetected = true
+            victorySignRight = { detected: true, confidence: gesture.score }
+            console.log('✅ Victory sign MATCHED on RIGHT hand!')
+          } else {
+            console.log(`❌ Victory sign on WRONG hand (${hand}), need Right`)
+          }
+        } else if (gesture.categoryName === 'Thumb_Up') {
+          console.log(`👍 Thumbs up detected! Hand is: "${hand}" (checking for "Left")`)
+          if (hand === 'Left') {
+            thumbsUpDetected = true
+            thumbsUpLeft = { detected: true, confidence: gesture.score }
+            console.log('✅ Thumbs up MATCHED on LEFT hand!')
+          } else {
+            console.log(`❌ Thumbs up on WRONG hand (${hand}), need Left`)
+          }
         }
       }
     })

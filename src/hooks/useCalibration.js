@@ -107,7 +107,7 @@ export const useCalibration = (handData, enabled = true) => {
     // Get the current step's gesture
     const currentGesture = gestures[currentStep.id]
 
-    if (currentGesture && currentGesture.detected && currentGesture.confidence > 0.7) {
+    if (currentGesture && currentGesture.detected && currentGesture.confidence > 0.6) {
       // Gesture is being held
       if (!isHoldingGesture) {
         setIsHoldingGesture(true)
