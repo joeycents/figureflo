@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState } from 'react'
 import './App.css'
 import { useHandTracking } from './hooks/useHandTracking'
 import { useSynthesizer } from './hooks/useSynthesizer'
+import { useEmotionDetection } from './hooks/useEmotionDetection'
 import { processGestures } from './utils/gestureMapping'
 
 function App() {
@@ -22,6 +23,9 @@ function App() {
   
   const [gestureData, setGestureData] = useState(null)
   const [wasPlaying, setWasPlaying] = useState(false)
+
+  // Emotion detection (enabled after synthesizer starts)
+  const { emotions, isProcessing: isProcessingEmotion, error: emotionError, hasApiKey } = useEmotionDetection(videoRef, isStarted)
 
   // Start audio context on user interaction
   const handleStart = async () => {
@@ -79,7 +83,23 @@ function App() {
           </div>
         )}
 
+        {/* Emotion Display - Simplified and outside video */}
+        {emotions && (
+          <div className="emotion-badge">
+            <span className="emotion-icon">😊</span>
+            <span className="emotion-label">{emotions.topEmotion.name}</span>
+            <span className="emotion-score">{(emotions.topEmotion.score * 100).toFixed(0)}%</span>
+          </div>
+        )}
+        
+        {emotionError && !hasApiKey && (
+          <div className="emotion-warning-inline">
+            ⚠️ Hume API key not configured
+          </div>
+        )}
+
         <div className="video-container">
+
           <video
             ref={videoRef}
             autoPlay
