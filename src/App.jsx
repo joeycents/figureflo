@@ -4,15 +4,20 @@ import { useHandTracking } from './hooks/useHandTracking'
 import { useSynthesizer } from './hooks/useSynthesizer'
 import { useEmotionDetection } from './hooks/useEmotionDetection'
 import { useCalibration } from './hooks/useCalibration'
+import { useFluidSimulation } from './hooks/useFluidSimulation'
 import { processGestures } from './utils/gestureMapping'
+import { HSVtoRGB, noteToHue } from './utils/fluidHelpers'
+import { getEmotionColorPalette } from './utils/emotionFluidMapping'
 import CalibrationOverlay from './components/CalibrationOverlay'
 
 function App() {
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const videoContainerRef = useRef(null)
+  const fluidCanvasRef = useRef(null)
   
   const { handData, isLoading, error } = useHandTracking(videoRef, canvasRef)
+  
   const {
     start,
     stop,
@@ -67,6 +72,38 @@ function App() {
   // Track which hands are playing
   const [leftWasPlaying, setLeftWasPlaying] = useState(false)
   const [rightWasPlaying, setRightWasPlaying] = useState(false)
+
+  // Track previous hand positions for velocity calculation (fluid simulation)
+  const prevHandPositionsRef = useRef({})
+
+  // Initialize fluid simulation - pass config with isReady flag
+  const { createSplat, updateConfig: updateFluidConfig, setEmotion: setFluidEmotion } = useFluidSimulation(
+    fluidCanvasRef,
+    { isReady: calibrationComplete && !showLoading }
+  )
+  
+  // Debug effect
+  useEffect(() => {
+    console.log('🎬 App State:', {
+      isLoading,
+      calibrationComplete,
+      showLoading,
+      hasVideoRef: !!videoRef.current,
+      hasCanvasRef: !!canvasRef.current,
+      hasFluidCanvasRef: !!fluidCanvasRef.current
+    })
+  }, [isLoading, calibrationComplete, showLoading])
+  
+  // Ensure fluid canvas has proper dimensions
+  useEffect(() => {
+    if (fluidCanvasRef.current && calibrationComplete && !showLoading) {
+      const canvas = fluidCanvasRef.current
+      const rect = canvas.getBoundingClientRect()
+      console.log('🎨 Setting fluid canvas dimensions:', rect.width, rect.height)
+      canvas.width = rect.width
+      canvas.height = rect.height
+    }
+  }, [calibrationComplete, showLoading])
 
   // Progress bar effect - increase to 80% over 8 seconds
   useEffect(() => {
@@ -132,6 +169,13 @@ function App() {
 
   // Emotion detection (enabled after synthesizer starts)
   const { emotions, isProcessing: isProcessingEmotion, error: emotionError, hasApiKey } = useEmotionDetection(videoRef, isStarted)
+
+  // Update fluid simulation based on emotions
+  useEffect(() => {
+    if (emotions && emotions.topEmotion && setFluidEmotion) {
+      setFluidEmotion(emotions.topEmotion.name, emotions.topEmotion.score)
+    }
+  }, [emotions, setFluidEmotion])
 
   // Start audio context on user interaction
   const handleStart = async () => {
@@ -269,6 +313,56 @@ function App() {
       // Skip control gestures if music is not enabled or stopped
       if (!canPlay || isStopped) return
 
+      // Calculate hand velocity for fluid simulation
+      const handId = `${handType}_${hand.handedness}`
+      const prevPos = prevHandPositionsRef.current[handId] || { x: hand.normalizedX, y: hand.normalizedY }
+      const dx = (hand.normalizedX - prevPos.x) * 100 // Scale up velocity
+      const dy = (hand.normalizedY - prevPos.y) * 100
+      prevHandPositionsRef.current[handId] = { x: hand.normalizedX, y: hand.normalizedY }
+
+      // Create fluid splat when hand is active (pinched)
+      if (hand.isPinched && createSplat) {
+        // Debug hand position
+        if (hand.normalizedX === undefined || hand.normalizedY === undefined) {
+          console.error('❌ Hand position undefined:', hand)
+          return
+        }
+        
+        // Map note to color
+        const hue = noteToHue(hand.note)
+        const emotionPalette = emotions?.topEmotion 
+          ? getEmotionColorPalette(emotions.topEmotion.name)
+          : null
+        
+        // Blend hue with emotion palette if available
+        let finalHue = hue
+        if (emotionPalette) {
+          const [minHue, maxHue] = emotionPalette.hueRange
+          // Constrain hue to emotion range
+          finalHue = minHue + (hue * (maxHue - minHue))
+        }
+        
+        // Generate color from hue
+        const saturation = emotionPalette?.saturation || 1.0
+        const brightness = emotionPalette?.brightness || 1.0
+        const baseColor = HSVtoRGB(finalHue, saturation, brightness)
+        
+        // Adjust intensity by velocity
+        const intensityMultiplier = hand.velocity * 0.3 // 0.3 factor to prevent too bright
+        const color = {
+          r: baseColor.r * intensityMultiplier,
+          g: baseColor.g * intensityMultiplier,
+          b: baseColor.b * intensityMultiplier
+        }
+        
+        // Create splat at hand position
+        // Flip X coordinate to un-mirror (webcam is mirrored, but fluid should match physical position)
+        // Flip Y coordinate since canvas Y is inverted from hand tracking Y
+        const fluidX = 1 - hand.normalizedX  // Un-mirror the X coordinate
+        const fluidY = 1 - hand.normalizedY  // Invert Y as before
+        createSplat(fluidX, fluidY, -dx, -dy, color) // Also flip dx since X is flipped
+      }
+
       // Continuously update musical parameters based on hand position
       if (hand.isPinched) {
         updateParams(
@@ -300,7 +394,9 @@ function App() {
     leftThumbsUpTime,
     leftThumbsDownTime,
     rightThumbsUpTime,
-    rightThumbsDownTime
+    rightThumbsDownTime,
+    createSplat,
+    emotions
   ])
 
   // Green glow effect when gesture is successfully detected during calibration
@@ -375,37 +471,105 @@ function App() {
           </div>
         )}
 
-        {/* Hidden video/canvas during loading - needed for MediaPipe to initialize */}
-        <div 
-          ref={videoContainerRef}
-          className="video-container"
-          style={{ 
-            position: showLoading ? 'absolute' : 'relative',
-            visibility: showLoading ? 'hidden' : 'visible',
-            width: '100%',
-            maxWidth: '800px'
-          }}
-        >
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            style={{ width: '100%', display: 'block', transform: 'scaleX(-1)' }}
-          />
-          <canvas
-            ref={canvasRef}
+        {/* Dual View: Webcam + Fluid Simulation Side-by-Side */}
+        {!showLoading && calibrationComplete && (
+          <div className="dual-view-container">
+            {/* Webcam Column */}
+            <div className="webcam-column">
+              <div 
+                ref={videoContainerRef}
+                className="video-container"
+                style={{ position: 'relative', width: '100%', height: '100%' }}
+              >
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  style={{ width: '100%', height: '100%', display: 'block', transform: 'scaleX(-1)', objectFit: 'cover' }}
+                />
+                <canvas
+                  ref={canvasRef}
+                  style={{ 
+                    position: 'absolute', 
+                    top: 0, 
+                    left: 0, 
+                    width: '100%', 
+                    height: '100%',
+                    transform: 'scaleX(-1)',
+                    pointerEvents: 'none'
+                  }}
+                />
+                <div style={{
+                  position: 'absolute',
+                  top: '10px',
+                  right: '10px',
+                  color: 'white',
+                  background: 'rgba(0,0,0,0.5)',
+                  padding: '8px',
+                  borderRadius: '4px',
+                  fontSize: '14px',
+                  zIndex: 10
+                }}>
+                  📹 Webcam
+                </div>
+              </div>
+            </div>
+
+            {/* Fluid Simulation Column */}
+            <div className="fluid-column">
+              <div style={{ position: 'relative' }}>
+                <canvas ref={fluidCanvasRef} className="fluid-canvas" />
+                <div style={{
+                  position: 'absolute',
+                  top: '10px',
+                  left: '10px',
+                  color: 'white',
+                  background: 'rgba(0,0,0,0.5)',
+                  padding: '8px',
+                  borderRadius: '4px',
+                  fontSize: '14px'
+                }}>
+                  🌊 Fluid Simulation
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Hidden video/canvas during loading and calibration */}
+        {(!calibrationComplete || showLoading) && (
+          <div 
+            ref={videoContainerRef}
+            className="video-container"
             style={{ 
-              position: 'absolute', 
-              top: 0, 
-              left: 0, 
-              width: '100%', 
-              height: '100%',
-              transform: 'scaleX(-1)',
-              pointerEvents: 'none'
+              position: showLoading ? 'absolute' : 'relative',
+              visibility: showLoading ? 'hidden' : 'visible',
+              width: '100%',
+              maxWidth: '800px'
             }}
-          />
-        </div>
+          >
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              style={{ width: '100%', display: 'block', transform: 'scaleX(-1)' }}
+            />
+            <canvas
+              ref={canvasRef}
+              style={{ 
+                position: 'absolute', 
+                top: 0, 
+                left: 0, 
+                width: '100%', 
+                height: '100%',
+                transform: 'scaleX(-1)',
+                pointerEvents: 'none'
+              }}
+            />
+          </div>
+        )}
 
         {/* Calibration Overlay - overlays on top of video */}
         {!showLoading && !calibrationComplete && !error && (

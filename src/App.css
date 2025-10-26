@@ -543,3 +543,70 @@ main {
   font-size: 1rem;
   text-align: center;
 }
+
+/* Dual View Layout - Side by Side */
+.dual-view-container {
+  display: flex;
+  gap: 2rem;
+  width: 100%;
+  max-width: 1600px;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.webcam-column {
+  flex: 0 0 45%;
+  max-width: 700px;
+}
+
+.fluid-column {
+  flex: 0 0 50%;
+  max-width: 800px;
+}
+
+.fluid-canvas {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(102, 126, 234, 0.3);
+  display: block;
+  min-height: 400px; /* Ensure minimum height */
+  border: 2px solid rgba(102, 126, 234, 0.3); /* Debug border */
+}
+
+/* Responsive layout for tablets */
+@media (max-width: 1200px) {
+  .dual-view-container {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .webcam-column,
+  .fluid-column {
+    flex: 1 1 100%;
+    max-width: 800px;
+    width: 100%;
+  }
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .App {
+    padding: 1rem;
+  }
+
+  h1 {
+    font-size: 2rem;
+  }
+
+  .dual-view-container {
+    gap: 1rem;
+  }
+
+  .webcam-column,
+  .fluid-column {
+    max-width: 100%;
+  }
+}

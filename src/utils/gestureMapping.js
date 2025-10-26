@@ -352,6 +352,11 @@ export const processGestures = (handData) => {
     const isFist = detectFist(landmarks)
     const isVictorySign = detectVictorySign(landmarks)
     
+    // Calculate hand center position for fluid simulation
+    const handCenter = calculateHandCenter(landmarks)
+    const normalizedX = handCenter ? handCenter.x : 0.5
+    const normalizedY = handCenter ? handCenter.y : 0.5
+    
     hands.push({
       handedness, // This is now the PHYSICAL hand (left/right in real world)
       landmarks,
@@ -367,7 +372,9 @@ export const processGestures = (handData) => {
       isThumbsUp,
       isThumbsDown,
       isFist,
-      isVictorySign
+      isVictorySign,
+      normalizedX,    // Hand center X position (0-1)
+      normalizedY     // Hand center Y position (0-1)
     })
   }
   
